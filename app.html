@@ -1,0 +1,2426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NCAA Scout</title>
+<style>
+  /* ── Reset & Base ── */
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--surface3:#2a2f47;
+    --border:#2e3250;--border2:#3d4466;
+    --accent:#4f8ef7;--accent2:#3a6fd8;--green:#3ecf8e;--red:#f75959;
+    --yellow:#f7c948;--orange:#f7954a;
+    --text:#e8eaf6;--text2:#9ea3c0;--text3:#6b7099;
+    --radius:8px;--radius2:12px;
+    --font:'Inter',system-ui,-apple-system,sans-serif;
+  }
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+
+  /* ── Layout ── */
+  #app{display:flex;height:100vh;overflow:hidden}
+  #sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+  #main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+
+  /* ── Sidebar ── */
+  .sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+  .sidebar-logo svg{color:var(--accent);flex-shrink:0}
+  .sidebar-logo-text{font-size:15px;font-weight:700;letter-spacing:-.3px;line-height:1.2}
+  .sidebar-logo-text span{color:var(--accent)}
+  .sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}
+  .nav-section{padding:8px 16px 4px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;border-radius:0;color:var(--text2);transition:background .15s,color .15s;font-size:13px}
+  .nav-item:hover{background:var(--surface2);color:var(--text)}
+  .nav-item.active{background:var(--surface2);color:var(--accent);font-weight:600}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0}
+  .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
+
+  /* ── Top bar ── */
+  #topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;min-height:56px;flex-shrink:0}
+  #topbar h1{font-size:16px;font-weight:700;flex:1}
+  #topbar .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2)}
+  #topbar .badge.green{background:#0d3326;color:var(--green)}
+
+  /* ── Page sections ── */
+  .page{display:none;flex:1;padding:24px}
+  .page.active{display:flex;flex-direction:column;gap:20px}
+
+  /* ── Cards ── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:20px}
+  .card-title{font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+  .card-grid{display:grid;gap:16px}
+  .card-grid.cols2{grid-template-columns:1fr 1fr}
+  .card-grid.cols3{grid-template-columns:1fr 1fr 1fr}
+  .card-grid.cols4{grid-template-columns:repeat(4,1fr)}
+
+  /* ── Stat tiles ── */
+  .stat-tile{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center}
+  .stat-tile .val{font-size:28px;font-weight:800;line-height:1}
+  .stat-tile .lbl{font-size:11px;color:var(--text3);margin-top:6px;text-transform:uppercase;letter-spacing:.05em}
+  .stat-tile.green .val{color:var(--green)}
+  .stat-tile.red   .val{color:var(--red)}
+  .stat-tile.blue  .val{color:var(--accent)}
+  .stat-tile.yellow .val{color:var(--yellow)}
+
+  /* ── Forms ── */
+  .form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .form-group{display:flex;flex-direction:column;gap:6px}
+  .form-group label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+  input[type=text],input[type=number],select{
+    background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+    border-radius:var(--radius);padding:8px 12px;font-size:13px;min-width:140px;
+    outline:none;transition:border-color .15s
+  }
+  input:focus,select:focus{border-color:var(--accent)}
+  select option{background:var(--surface2)}
+
+  /* ── Buttons ── */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:var(--radius);border:none;cursor:pointer;font-size:13px;font-weight:600;transition:background .15s,opacity .15s}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover:not(:disabled){background:var(--accent2)}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+  .btn-secondary:hover:not(:disabled){background:var(--surface3)}
+  .btn-danger{background:#3d1414;color:var(--red);border:1px solid #5a1a1a}
+  .btn-danger:hover:not(:disabled){background:#5a1a1a}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  .btn-icon{padding:6px;border-radius:6px}
+
+  /* ── Tables ── */
+  .tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:var(--surface2);color:var(--text3);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:10px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border)}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+  tbody tr:last-child{border-bottom:none}
+  tbody tr:hover{background:var(--surface2)}
+  tbody td{padding:9px 12px;font-size:13px;vertical-align:middle}
+  td.num,th.num{text-align:right}
+  td.center,th.center{text-align:center}
+
+  /* ── Result pills ── */
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+  .pill.W{background:#0d3326;color:var(--green)}
+  .pill.L{background:#3d0f0f;color:var(--red)}
+  .pill.T{background:#2a2a2a;color:var(--text2)}
+
+  /* ── Log / progress ── */
+  #scrape-log{background:#0a0d14;border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-family:'Fira Code',monospace;font-size:12px;height:220px;overflow-y:auto;color:#7ecfaa}
+  .log-line{margin:1px 0;line-height:1.6}
+  .log-info{color:#7ecfaa}
+  .log-warn{color:var(--yellow)}
+  .log-error{color:var(--red)}
+  .log-progress{color:var(--accent)}
+  .log-done{color:var(--green);font-weight:700}
+
+  /* ── Progress bar ── */
+  .progress-bar-wrap{background:var(--surface2);border-radius:20px;height:6px;overflow:hidden}
+  .progress-bar-fill{height:100%;background:var(--accent);border-radius:20px;transition:width .3s}
+
+  /* ── Search results ── */
+  #team-search-results{max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2)}
+  .search-result-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s}
+  .search-result-item:last-child{border-bottom:none}
+  .search-result-item:hover{background:var(--surface3)}
+  .search-result-item .name{font-weight:600}
+  .search-result-item .meta{font-size:11px;color:var(--text3);margin-top:2px}
+
+  /* ── PBP viewer ── */
+  #pbp-panel{display:flex;flex-direction:column;gap:0}
+  .inning-group{margin-bottom:4px}
+  .inning-header{background:var(--surface2);padding:8px 14px;font-size:12px;font-weight:700;color:var(--text3);cursor:pointer;border-radius:var(--radius);display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.04em}
+  .inning-header:hover{background:var(--surface3)}
+  .inning-plays{display:none;padding:4px 0}
+  .inning-plays.open{display:block}
+  .play-row{display:flex;align-items:flex-start;gap:10px;padding:7px 14px;border-bottom:1px solid var(--border);font-size:12px}
+  .play-row:last-child{border-bottom:none}
+  .play-type-badge{flex-shrink:0;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;min-width:56px;text-align:center}
+  .play-text{color:var(--text);line-height:1.5}
+  .play-score{flex-shrink:0;font-size:11px;color:var(--text3);font-weight:600;min-width:40px;text-align:right}
+
+  /* play type colors */
+  .pt-hr{background:#3d1a00;color:#f7954a}
+  .pt-triple{background:#2d1d00;color:var(--yellow)}
+  .pt-double{background:#1a2a10;color:#7eee5a}
+  .pt-single{background:#0d2a1a;color:var(--green)}
+  .pt-walk{background:#0d1e3d;color:var(--accent)}
+  .pt-hbp{background:#0d1e3d;color:#8ab4ff}
+  .pt-strikeout{background:#3d0d0d;color:var(--red)}
+  .pt-out{background:#222236;color:var(--text3)}
+  .pt-error{background:#2a1a00;color:var(--orange)}
+  .pt-steal{background:#1a0d2a;color:#c77eff}
+  .pt-sac{background:#1a1a2a;color:var(--text2)}
+  .pt-wp,.pt-pb{background:#2a2a0d;color:var(--yellow)}
+  .pt-other{background:var(--surface3);color:var(--text3)}
+
+  /* ── PBP tab switcher ── */
+  .pbp-tab-bar{display:flex;gap:4px;background:var(--surface2);border-radius:8px;padding:3px;width:fit-content}
+  .pbp-tab{padding:5px 14px;border-radius:6px;border:none;background:transparent;color:var(--text3);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
+  .pbp-tab:hover{color:var(--text)}
+  .pbp-tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+
+  /* ── Spray chart ── */
+  #pbp-spray-panel{padding:12px 0}
+  .spray-filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+  .spray-filters label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+  .spray-filters select{min-width:130px;padding:5px 10px;font-size:12px}
+  .spray-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .spray-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+  .spray-dot-preview{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  #spray-svg-wrap{position:relative;overflow:visible}
+
+  /* ── Matchup table ── */
+  #mu-tbody tr.mu-batter-row{cursor:pointer}
+  #mu-tbody tr.mu-batter-row:hover td{background:var(--surface2)}
+  #mu-tbody tr.mu-pitcher-row td{background:var(--surface);padding-left:36px;font-size:12px;color:var(--text2);border-top:none}
+  #mu-tbody tr.mu-pitcher-row td:first-child{color:var(--text3)}
+  #mu-tab-a,#mu-tab-b{transition:color .15s,border-color .15s}
+
+  /* ── Player spray modal ── */
+  #player-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:none;align-items:center;justify-content:center}
+  #player-modal-overlay.open{display:flex}
+  #player-modal{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:24px;width:min(600px,95vw);max-height:90vh;overflow-y:auto;position:relative}
+  #player-modal-close{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1;padding:4px 8px}
+  #player-modal-close:hover{color:var(--text)}
+  #player-modal-title{font-size:16px;font-weight:700;margin-bottom:12px;padding-right:32px}
+  #player-modal-stats{margin-bottom:4px}
+  #player-modal-spray{margin-top:8px}
+  #player-modal .spray-legend{margin-top:10px}
+  .spray-tooltip{position:fixed;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--text);pointer-events:none;z-index:1000;max-width:240px;line-height:1.5;display:none}
+
+  /* ── Misc ── */
+  .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:var(--surface3);color:var(--text2)}
+  .away-tag{background:#1a2a3d;color:var(--accent)}
+  .empty-state{text-align:center;padding:48px 24px;color:var(--text3)}
+  .empty-state svg{width:48px;height:48px;margin:0 auto 12px;display:block;opacity:.3}
+  .empty-state p{font-size:13px;margin-top:6px}
+  .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .divider{height:1px;background:var(--border);margin:4px 0}
+  .text-green{color:var(--green)}
+  .text-red{color:var(--red)}
+  .text-yellow{color:var(--yellow)}
+  .text-accent{color:var(--accent)}
+  .text-muted{color:var(--text3)}
+  .flex{display:flex}
+  .flex-col{display:flex;flex-direction:column}
+  .items-center{align-items:center}
+  .gap-2{gap:8px}
+  .gap-4{gap:16px}
+  .mt-2{margin-top:8px}
+  .mt-4{margin-top:16px}
+  .font-bold{font-weight:700}
+  .hidden{display:none!important}
+
+  /* ── Responsive ── */
+  @media(max-width:700px){
+    #sidebar{display:none}
+    .card-grid.cols4{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ Sidebar ══ -->
+  <div id="sidebar">
+    <div class="sidebar-logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+      <div class="sidebar-logo-text">NCAA<br><span>Scout</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Admin</div>
+      <div class="nav-item active" onclick="requestAdminAccess()" id="nav-admin" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        Scrape Data
+      </div>
+      <div class="nav-section">Scout View</div>
+      <div class="nav-item" onclick="showPage('scout')" id="nav-scout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        Schedule
+      </div>
+      <div class="nav-item" onclick="showPage('pbp')" id="nav-pbp">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+        Play-by-Play
+      </div>
+      <div class="nav-item" onclick="showPage('batting')" id="nav-batting">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 3l18 18M3 3l5 5-5 5M21 3l-5 5 5 5"/>
+        </svg>
+        Batting Stats
+      </div>
+      <div class="nav-item" onclick="showPage('pitching')" id="nav-pitching">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+        Pitching Stats
+      </div>
+      <div class="nav-item" onclick="showPage('players')" id="nav-players">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Roster
+      </div>
+      <div class="nav-section">Analysis</div>
+      <div class="nav-item" onclick="showPage('matchup')" id="nav-matchup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+        </svg>
+        Matchup
+      </div>
+    </nav>
+    <div class="sidebar-footer" style="display:flex;align-items:center;justify-content:space-between">
+      <span>stats.ncaa.org</span>
+      <button onclick="requestAdminAccess()" title="Admin" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:2px 4px;font-size:13px;opacity:.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.5">🔒</button>
+    </div>
+  </div>
+
+  <!-- ══ Main ══ -->
+  <div id="main">
+
+    <!-- Top bar -->
+    <div id="topbar">
+      <h1 id="topbar-title">Scrape Data</h1>
+      <div id="topbar-team" class="hidden">
+        <span id="topbar-team-name" class="font-bold"></span>
+        <span id="topbar-season" class="text-muted" style="margin-left:8px;font-size:12px"></span>
+      </div>
+      <div id="topbar-badge" class="badge hidden"></div>
+    </div>
+
+    <!-- ════ Admin Page ════ -->
+    <div class="page active" id="page-admin">
+
+      <!-- Team finder -->
+      <div class="card">
+        <div class="card-title">Teams</div>
+
+        <!-- Add a team -->
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:14px;margin-bottom:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">
+            Add Team to Database
+          </div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:10px">
+            Find the team on <a href="https://stats.ncaa.org" target="_blank" style="color:var(--accent)">stats.ncaa.org</a> — the number in the URL is the Team ID.<br>
+            Example: <code style="background:var(--surface3);padding:1px 6px;border-radius:3px;font-size:11px">https://stats.ncaa.org/teams/<strong>615122</strong></code>
+          </div>
+          <div class="form-row" style="flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group">
+              <label>NCAA Team ID</label>
+              <input type="text" id="admin-team-url" placeholder="615122"
+                style="width:130px" onkeydown="if(event.key==='Enter')document.getElementById('admin-team-name-override').focus()">
+            </div>
+            <div class="form-group" style="flex:2;min-width:200px">
+              <label>Team Name</label>
+              <input type="text" id="admin-team-name-override" placeholder="e.g. Holy Family University"
+                style="width:100%" onkeydown="if(event.key==='Enter')adminLookupUrl()">
+            </div>
+            <div class="form-group">
+              <label>Division</label>
+              <select id="admin-url-div">
+                <option value="2" selected>D2</option>
+                <option value="1">D1</option>
+                <option value="3">D3</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>&nbsp;</label>
+              <button class="btn btn-primary" onclick="adminLookupUrl()">Save to DB</button>
+            </div>
+          </div>
+          <div id="url-lookup-status" style="font-size:12px;color:var(--text3);margin-top:6px"></div>
+        </div>
+
+        <!-- Select a saved team -->
+        <div style="background:var(--surface2);border:1px solid var(--accent);border-radius:var(--radius);padding:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">
+            Load a Team
+          </div>
+          <select id="admin-team-sel" onchange="selectTeamFromDropdown()" style="width:100%;font-size:14px">
+            <option value="">— choose a saved team —</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- Scrape controls -->
+      <div class="card" id="scrape-controls" style="display:none">
+        <div class="card-title">Scrape Options</div>
+        <div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <input type="text" id="scrape-team-name" placeholder="Team name"
+              style="font-size:15px;font-weight:700;flex:1;background:transparent;border:1px solid var(--border2);padding:4px 8px;border-radius:6px"
+              title="Edit to rename this team">
+          </div>
+          <div style="font-size:12px;color:var(--text3)" id="scrape-team-meta">—</div>
+          <div style="font-size:11px;color:var(--accent);margin-top:4px" id="scrape-team-id">NCAA ID: —</div>
+        </div>
+        <div class="form-row" style="margin-bottom:16px">
+          <div class="form-group">
+            <label>Season Year</label>
+            <select id="scrape-year"></select>
+          </div>
+          <div class="form-group">
+            <label>PBP</label>
+            <select id="scrape-skip-pbp">
+              <option value="false">Scrape play-by-play</option>
+              <option value="true">Skip PBP (schedule only)</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex-direction:row;align-items:flex-end;gap:8px">
+            <button class="btn btn-primary" id="scrape-btn" onclick="startScrape()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Scrape Team
+            </button>
+            <button class="btn btn-secondary" id="scrape-stats-btn" onclick="startStatsScrape()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Scrape Stats
+            </button>
+            <button class="btn btn-secondary" id="resolve-names-btn" onclick="startResolveNames()" title="Match batter names in play-by-play to roster IDs">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Resolve Names
+            </button>
+            <button class="btn btn-secondary" id="resolve-pitchers-btn" onclick="startResolvePitchers()" title="Detect pitcher names from play-by-play substitution text">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              Resolve Pitchers
+            </button>
+            <button class="btn btn-secondary" onclick="viewScrapedTeam()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              View in Scout
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2" style="margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600;color:var(--text3)">Progress</div>
+          <div style="flex:1" id="scrape-progress-wrap" class="progress-bar-wrap hidden">
+            <div class="progress-bar-fill" id="scrape-progress-fill" style="width:0%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text3)" id="scrape-progress-text"></div>
+        </div>
+        <div id="scrape-log"></div>
+      </div>
+
+      <!-- DB Teams list -->
+      <div class="card">
+        <div class="card-title flex items-center gap-2">
+          Teams in Database
+          <span id="db-team-count" class="tag">0</span>
+          <div style="flex:1"></div>
+          <button class="btn btn-sm btn-secondary" onclick="loadDbTeams()">Refresh</button>
+        </div>
+        <div class="tbl-wrap" id="db-teams-wrap">
+          <table>
+            <thead><tr>
+              <th>Team</th><th>Division</th><th>Conference</th><th>NCAA ID</th><th>Last Scraped</th><th></th>
+            </tr></thead>
+            <tbody id="db-teams-tbody"><tr><td colspan="6" class="empty-state" style="padding:24px;text-align:center;color:var(--text3)">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ Scout: Schedule ════ -->
+    <div class="page" id="page-scout">
+      <div id="scout-picker" class="card">
+        <div class="card-title">Select Team</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Team</label>
+            <select id="scout-team-sel" onchange="scoutTeamChange()">
+              <option value="">— choose a team —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Season</label>
+            <select id="scout-year-sel" onchange="loadScoutSchedule()"></select>
+          </div>
+        </div>
+      </div>
+
+      <div id="scout-summary-row" class="card-grid cols4 hidden">
+        <div class="stat-tile green"><div class="val" id="sum-wins">—</div><div class="lbl">Wins</div></div>
+        <div class="stat-tile red"><div class="val" id="sum-losses">—</div><div class="lbl">Losses</div></div>
+        <div class="stat-tile blue"><div class="val" id="sum-rs">—</div><div class="lbl">Runs Scored</div></div>
+        <div class="stat-tile yellow"><div class="val" id="sum-ra">—</div><div class="lbl">Runs Allowed</div></div>
+      </div>
+
+      <div class="card hidden" id="scout-schedule-card">
+        <div class="card-title">Schedule</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Date</th><th>Opponent</th><th class="center">H/A</th>
+              <th class="center">Result</th><th class="num">Score</th><th class="num">Opp</th>
+              <th class="center">PBP</th><th></th>
+            </tr></thead>
+            <tbody id="schedule-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ Play-by-Play ════ -->
+    <div class="page" id="page-pbp">
+      <div class="card">
+        <div class="card-title">Game Play-by-Play</div>
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group">
+            <label>Team</label>
+            <select id="pbp-team-sel" onchange="pbpTeamChange()">
+              <option value="">— choose a team —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Season</label>
+            <select id="pbp-year-sel" onchange="loadPbpGameList()"></select>
+          </div>
+          <div class="form-group">
+            <label>Game</label>
+            <select id="pbp-game-sel" onchange="loadPbp()">
+              <option value="">— select season first —</option>
+            </select>
+          </div>
+          <div class="form-group" style="justify-content:flex-end">
+            <button class="btn btn-sm btn-secondary" onclick="scrapeSinglePbp()" id="pbp-scrape-btn" style="display:none">
+              Scrape PBP
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="pbp-game-header" style="display:none">
+        <div style="display:flex;align-items:center;gap:16px">
+          <div>
+            <div style="font-size:17px;font-weight:800" id="pbp-matchup">—</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:4px" id="pbp-date">—</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="text-align:center">
+            <div style="font-size:28px;font-weight:800" id="pbp-score">—</div>
+            <div id="pbp-result-pill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="pbp-card" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div class="pbp-tab-bar">
+            <button id="pbp-tab-log" class="pbp-tab active" onclick="setPbpTab('log')">Play Log</button>
+            <button id="pbp-tab-spray" class="pbp-tab" onclick="setPbpTab('spray')">Spray Chart</button>
+          </div>
+          <span id="pbp-play-count" class="tag">0 plays</span>
+          <div style="flex:1"></div>
+          <button id="pbp-expand-btn" class="btn btn-sm btn-secondary" onclick="toggleAllInnings()">Expand All</button>
+        </div>
+        <!-- Play Log tab -->
+        <div id="pbp-panel"></div>
+        <!-- Spray Chart tab -->
+        <div id="pbp-spray-panel" style="display:none">
+          <div class="spray-filters">
+            <div>
+              <label>Batter</label>
+              <select id="spray-batter-sel" onchange="renderSprayChart(state.currentPlays)">
+                <option value="">All Batters</option>
+              </select>
+            </div>
+            <div>
+              <label>Play Type</label>
+              <select id="spray-type-sel" onchange="renderSprayChart(state.currentPlays)">
+                <option value="">All Types</option>
+                <option value="single">Single</option>
+                <option value="double">Double</option>
+                <option value="triple">Triple</option>
+                <option value="hr">Home Run</option>
+                <option value="out">Out</option>
+                <option value="error">Error</option>
+                <option value="walk">Walk</option>
+                <option value="sac">Sac</option>
+              </select>
+            </div>
+          </div>
+          <div id="spray-svg-wrap"></div>
+          <div class="spray-legend">
+            <div class="spray-legend-item"><span class="spray-dot-preview" style="background:#22c55e"></span>Single</div>
+            <div class="spray-legend-item"><span class="spray-dot-preview" style="background:#3b82f6"></span>Double</div>
+            <div class="spray-legend-item"><span class="spray-dot-preview" style="background:#a855f7"></span>Triple</div>
+            <div class="spray-legend-item"><span class="spray-dot-preview" style="background:#f59e0b"></span>Home Run</div>
+            <div class="spray-legend-item"><span class="spray-dot-preview" style="background:#ef4444"></span>Out</div>
+            <div class="spray-legend-item"><span class="spray-dot-preview" style="background:#f97316"></span>Error</div>
+            <div class="spray-legend-item"><span class="spray-dot-preview" style="background:#06b6d4"></span>Walk/HBP</div>
+            <div class="spray-legend-item"><span class="spray-dot-preview" style="background:#6b7280"></span>Sac/Other</div>
+          </div>
+        </div>
+      </div>
+      <div class="spray-tooltip" id="spray-tooltip"></div>
+
+      <div id="pbp-empty" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><polyline points="9 9 10 9 11 9"/></svg>
+        <p>Select a team, season, and game to view play-by-play</p>
+      </div>
+    </div>
+
+    <!-- ════ Batting Stats ════ -->
+    <div class="page" id="page-batting">
+      <div class="card">
+        <div class="card-title">Batting Statistics</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Team</label>
+            <select id="bat-team-sel" onchange="batTeamChange()">
+              <option value="">— choose a team —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Season</label>
+            <select id="bat-year-sel" onchange="loadBatting()"></select>
+          </div>
+        </div>
+      </div>
+      <div class="card hidden" id="bat-card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Player</th><th>Pos</th><th>Yr</th>
+              <th class="num">G</th><th class="num">AB</th><th class="num">R</th><th class="num">H</th>
+              <th class="num">2B</th><th class="num">3B</th><th class="num">HR</th><th class="num">RBI</th>
+              <th class="num">BB</th><th class="num">SO</th><th class="num">SB</th><th class="num">HBP</th>
+              <th class="num">AVG</th><th class="num">OBP</th><th class="num">SLG</th><th class="num">OPS</th>
+            </tr></thead>
+            <tbody id="bat-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ Pitching Stats ════ -->
+    <div class="page" id="page-pitching">
+      <div class="card">
+        <div class="card-title">Pitching Statistics</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Team</label>
+            <select id="pit-team-sel" onchange="pitTeamChange()">
+              <option value="">— choose a team —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Season</label>
+            <select id="pit-year-sel" onchange="loadPitching()"></select>
+          </div>
+        </div>
+      </div>
+      <div class="card hidden" id="pit-card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Player</th><th>Yr</th>
+              <th class="num">G</th><th class="num">GS</th><th class="num">W</th><th class="num">L</th><th class="num">SV</th>
+              <th class="num">IP</th><th class="num">H</th><th class="num">R</th><th class="num">ER</th>
+              <th class="num">BB</th><th class="num">SO</th><th class="num">HR</th>
+              <th class="num">ERA</th><th class="num">WHIP</th>
+            </tr></thead>
+            <tbody id="pit-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ Roster ════ -->
+    <div class="page" id="page-players">
+      <div class="card">
+        <div class="card-title">Roster</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Team</label>
+            <select id="rost-team-sel" onchange="rostTeamChange()">
+              <option value="">— choose a team —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Season</label>
+            <select id="rost-year-sel" onchange="loadRoster()"></select>
+          </div>
+        </div>
+      </div>
+      <div class="card hidden" id="rost-card">
+        <div class="card-title flex items-center gap-2">
+          Players
+          <span id="rost-count" class="tag">0</span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Name</th><th>Position</th><th>Year</th><th>NCAA Player ID</th>
+            </tr></thead>
+            <tbody id="rost-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ Matchup ════ -->
+    <div class="page" id="page-matchup">
+      <div class="card">
+        <div class="card-title">Batter vs Pitcher Matchup</div>
+        <div class="form-row" style="align-items:flex-end;flex-wrap:wrap;gap:12px">
+          <div class="form-group" style="flex:1;min-width:160px">
+            <label>Team A</label>
+            <select id="mu-team-a">
+              <option value="">— choose —</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:160px">
+            <label>Team B</label>
+            <select id="mu-team-b">
+              <option value="">— choose —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Season</label>
+            <select id="mu-year"></select>
+          </div>
+          <div class="form-group" style="padding-top:0">
+            <button class="btn btn-primary" onclick="loadMatchup()">Show Matchup</button>
+            <button class="btn btn-secondary" onclick="showMuScrapePanel()" id="mu-scrape-toggle" style="margin-left:6px" title="Re-scrape PBP for only the games between these two teams">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+              Re-scrape H2H
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- H2H re-scrape panel (hidden until button clicked) -->
+      <div class="card" id="mu-scrape-panel" style="display:none">
+        <div class="card-title flex items-center gap-2">
+          Re-scrape H2H PBP
+          <span style="font-size:11px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">
+            Wipes &amp; re-scrapes only the games between these two teams, then resolves names + pitchers.
+          </span>
+        </div>
+        <div class="form-row" style="margin-bottom:10px">
+          <button class="btn btn-primary" id="mu-scrape-btn" onclick="startH2hScrape()">Start Re-scrape</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('mu-scrape-panel').style.display='none'">Hide</button>
+        </div>
+        <div id="mu-scrape-log" style="background:#0a0d14;border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-family:'Fira Code',monospace;font-size:12px;height:180px;overflow-y:auto;color:#7ecfaa;display:none"></div>
+      </div>
+
+      <div id="mu-results" style="display:none">
+        <!-- Tab bar -->
+        <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:0">
+          <button id="mu-tab-a" onclick="showMuTab('a')"
+            style="padding:10px 20px;background:none;border:none;border-bottom:2px solid var(--accent);margin-bottom:-2px;color:var(--accent);font-weight:600;cursor:pointer;font-size:13px"
+            id="mu-tab-btn-a"></button>
+          <button id="mu-tab-b" onclick="showMuTab('b')"
+            style="padding:10px 20px;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text2);cursor:pointer;font-size:13px"
+            id="mu-tab-btn-b"></button>
+        </div>
+
+        <!-- Summary line -->
+        <div id="mu-summary" style="font-size:12px;color:var(--text3);padding:10px 0 4px"></div>
+
+        <!-- Batter vs pitcher table -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="tbl-wrap">
+            <table id="mu-table">
+              <thead>
+                <tr>
+                  <th style="width:32px">#</th>
+                  <th>Batter / Pitcher</th>
+                  <th class="num">PA</th>
+                  <th class="num">AB</th>
+                  <th class="num">H</th>
+                  <th class="num">2B</th>
+                  <th class="num">3B</th>
+                  <th class="num">HR</th>
+                  <th class="num">BB</th>
+                  <th class="num">K</th>
+                  <th class="num">AVG</th>
+                  <th class="num">K%</th>
+                </tr>
+              </thead>
+              <tbody id="mu-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Spray chart modal trigger note -->
+        <div style="font-size:11px;color:var(--text3);padding:6px 0">Click a batter row to see spray chart vs that pitching staff.</div>
+      </div>
+
+      <!-- Empty / error state -->
+      <div id="mu-empty" style="color:var(--text3);padding:32px 0;text-align:center">
+        Choose two teams and click <strong>Show Matchup</strong>.
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  teams: [],
+  selectedAdminTeam: null,
+  activeJobId: null,
+  activeJobEs: null,
+  allInningsOpen: false,
+  currentPlays: [],
+  currentPbpTab: 'log',
+  rosterPlayers: [],
+  battingStats: [],
+  seasonPlays: null,
+  seasonPlaysKey: null,
+};
+
+const YEAR_NOW = new Date().getFullYear();
+const YEARS = Array.from({length:6},(_,i)=>YEAR_NOW-i);
+
+// ── Utility ────────────────────────────────────────────────────────────────
+// ── Admin auth ─────────────────────────────────────────────────────────────
+let _adminToken = sessionStorage.getItem('adminToken') || null;
+
+function isAdminAuthed() { return !!_adminToken; }
+
+async function apiFetch(path, opts={}) {
+  const headers = { ...(opts.headers||{}) };
+  if (_adminToken) headers['x-admin-token'] = _adminToken;
+  const res = await fetch(path, { ...opts, headers });
+  const ct = res.headers.get('content-type')||'';
+  if (!ct.includes('json')) throw new Error(`Non-JSON response from ${path}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function adminLogin() {
+  const pw  = document.getElementById('admin-pw-input').value;
+  const err = document.getElementById('admin-pw-error');
+  err.textContent = '';
+  try {
+    const r = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      _adminToken = data.token;
+      sessionStorage.setItem('adminToken', _adminToken);
+      document.getElementById('admin-lock-modal').style.display = 'none';
+      document.getElementById('nav-admin').style.display = 'flex';
+      showPage('admin');
+    } else {
+      err.textContent = 'Wrong password — try again';
+      document.getElementById('admin-pw-input').value = '';
+      document.getElementById('admin-pw-input').focus();
+    }
+  } catch(e) {
+    err.textContent = 'Error: ' + e.message;
+  }
+}
+
+function requestAdminAccess() {
+  if (isAdminAuthed()) { showPage('admin'); return; }
+  document.getElementById('admin-pw-input').value = '';
+  document.getElementById('admin-pw-error').textContent = '';
+  document.getElementById('admin-lock-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('admin-pw-input').focus(), 50);
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  // PostgreSQL DATE values arrive as full ISO strings ("2025-02-14T00:00:00.000Z").
+  // Slice to "YYYY-MM-DD" before appending a noon-time so the local date is always correct.
+  const dateOnly = String(d).slice(0, 10);
+  return new Date(dateOnly + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+function fmtStat(v, decimals=0) {
+  if (v === null || v === undefined) return '—';
+  if (decimals > 0) return Number(v).toFixed(decimals).replace(/^0\./,'.');
+  return v;
+}
+
+function fmtAvg(v) {
+  if (v === null || v === undefined) return '—';
+  const n = Number(v);
+  return isNaN(n) ? '—' : n.toFixed(3).replace(/^0\./,'.');
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  const navEl = document.getElementById('nav-'+name);
+  if(navEl) navEl.classList.add('active');
+  const titles = {admin:'Scrape Data',scout:'Schedule',pbp:'Play-by-Play',batting:'Batting Stats',pitching:'Pitching Stats',players:'Roster',matchup:'Matchup'};
+  document.getElementById('topbar-title').textContent = titles[name]||name;
+  // Only show team/season badge on scout-related pages
+  const showTeam = ['scout','pbp','batting','pitching','players'].includes(name);
+  document.getElementById('topbar-team').classList.toggle('hidden', !showTeam);
+}
+
+// ── Year dropdowns ─────────────────────────────────────────────────────────
+function populateYears(selId, defaultYear=YEAR_NOW) {
+  const sel = document.getElementById(selId);
+  sel.innerHTML = YEARS.map(y=>`<option value="${y}"${y===defaultYear?' selected':''}>${y} (${y-1}-${String(y).slice(-2)})</option>`).join('');
+}
+
+// ── DB team list (sidebar selects) ─────────────────────────────────────────
+async function refreshTeamSelects() {
+  try {
+    const teams = await apiFetch('/api/teams');
+    state.teams = teams;
+    const opt = teams.map(t=>`<option value="${t.ncaa_team_id}">${t.name}</option>`).join('');
+    const empty = '<option value="">— choose a team —</option>';
+    ['scout-team-sel','pbp-team-sel','bat-team-sel','pit-team-sel','rost-team-sel'].forEach(id=>{
+      const el = document.getElementById(id);
+      el.innerHTML = empty + opt;
+    });
+    // Matchup selectors
+    const muEmpty = '<option value="">— choose —</option>';
+    document.getElementById('mu-team-a').innerHTML = muEmpty + opt;
+    document.getElementById('mu-team-b').innerHTML = muEmpty + opt;
+  } catch(e) { console.error('refreshTeamSelects', e); }
+}
+
+// ── URL/ID lookup ─────────────────────────────────────────────────────────
+async function adminLookupUrl() {
+  const urlOrId      = document.getElementById('admin-team-url').value.trim();
+  const nameOverride = (document.getElementById('admin-team-name-override').value||'').trim();
+  const div          = document.getElementById('admin-url-div').value;
+  const status       = document.getElementById('url-lookup-status');
+
+  if (!urlOrId)      { status.style.color='var(--red)'; status.textContent='Enter a Team ID first'; document.getElementById('admin-team-url').focus(); return; }
+  if (!nameOverride) { status.style.color='var(--red)'; status.textContent='Team name is required'; document.getElementById('admin-team-name-override').focus(); return; }
+
+  status.style.color = 'var(--text3)';
+  status.textContent = 'Saving…';
+
+  try {
+    const teams = await apiFetch('/api/teams/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: urlOrId, division: Number(div), name: nameOverride }),
+    });
+    if (!teams || !teams.length) { status.style.color='var(--red)'; status.textContent='Could not parse a team ID'; return; }
+    // Clear fields
+    document.getElementById('admin-team-url').value           = '';
+    document.getElementById('admin-team-name-override').value = '';
+    status.style.color   = 'var(--green)';
+    status.textContent   = `✓ Saved ${teams[0].name} (ID ${teams[0].ncaa_team_id})`;
+    // Refresh DB list so the new team appears in the dropdown, then auto-load it
+    await loadDbTeams();
+    document.getElementById('admin-team-sel').value = teams[0].ncaa_team_id;
+    selectAdminTeam(teams[0]);
+  } catch(e) {
+    status.style.color = 'var(--red)';
+    status.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function adminSearch() {
+  const q   = document.getElementById('admin-team-q').value.trim();
+  const div = document.getElementById('admin-div').value;
+  const box = document.getElementById('team-search-results');
+  const btn = document.getElementById('admin-search-btn');
+  if (!q) return;
+  box.classList.remove('hidden');
+  box.innerHTML = '<div style="padding:14px;color:var(--text3)"><span class="spinner"></span> Fetching team list from NCAA (may take ~5 seconds)…</div>';
+  btn.disabled = true;
+  try {
+    const teams = await apiFetch(`/api/teams/search?q=${encodeURIComponent(q)}&division=${div}`);
+    btn.disabled = false;
+    if (!teams.length) {
+      box.innerHTML = `<div style="padding:14px;color:var(--text3)">No results for "${q}". Try the URL method above — go to <a href="https://stats.ncaa.org" target="_blank" style="color:var(--accent)">stats.ncaa.org</a>, find your team, and paste their URL.</div>`;
+      return;
+    }
+    box.innerHTML = teams.map(t=>`
+      <div class="search-result-item" onclick="selectAdminTeam(${JSON.stringify(t).replace(/"/g,'&quot;')})">
+        <div class="name">${t.name}</div>
+        <div class="meta">${t.conference||'Unknown conference'} · D${t.division||div} · ID: ${t.ncaa_team_id}</div>
+      </div>`).join('');
+  } catch(e) {
+    btn.disabled = false;
+    box.innerHTML = `<div style="padding:14px;color:var(--red)">
+      ${e.message}<br><br>
+      <strong style="color:var(--text2)">Try the URL method above instead:</strong>
+      Go to <a href="https://stats.ncaa.org" target="_blank" style="color:var(--accent)">stats.ncaa.org</a>, find your team, and paste their URL.
+    </div>`;
+  }
+}
+
+function selectAdminTeam(team) {
+  state.selectedAdminTeam = team;
+  const sr = document.getElementById('team-search-results');
+  if (sr) sr.classList.add('hidden');
+  document.getElementById('scrape-controls').style.display = 'block';
+  document.getElementById('scrape-team-name').value = team.name;
+  document.getElementById('scrape-team-meta').textContent = `${team.conference||'—'} · Division ${team.division||'?'}`;
+  document.getElementById('scrape-team-id').textContent = `NCAA Team ID: ${team.ncaa_team_id}`;
+  populateYears('scrape-year');
+  clearLog();
+  logLine('info', `Selected: ${team.name} (ID ${team.ncaa_team_id})`);
+}
+
+function selectTeamFromDropdown() {
+  const id = Number(document.getElementById('admin-team-sel').value);
+  if (!id) return;
+  const team = (state.teams || []).find(t => Number(t.ncaa_team_id) === id);
+  if (team) selectAdminTeam(team);
+}
+
+
+// ── Admin: Scrape ─────────────────────────────────────────────────────────
+function clearLog() { document.getElementById('scrape-log').innerHTML=''; }
+function logLine(type, msg) {
+  const log = document.getElementById('scrape-log');
+  const div = document.createElement('div');
+  div.className = `log-line log-${type}`;
+  div.textContent = `${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'})} ${msg}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function startScrape() {
+  const team = state.selectedAdminTeam;
+  if (!team) return;
+  const year         = document.getElementById('scrape-year').value;
+  const skipPbp      = document.getElementById('scrape-skip-pbp').value === 'true';
+  const nameOverride = (document.getElementById('scrape-team-name').value||'').trim() || null;
+  const btn          = document.getElementById('scrape-btn');
+
+  btn.disabled = true;
+  clearLog();
+  logLine('info', `Starting scrape: ${nameOverride || team.name} · ${year}`);
+
+  // Cancel previous SSE if any
+  if (state.activeJobEs) { state.activeJobEs.close(); state.activeJobEs = null; }
+
+  try {
+    const { jobId } = await apiFetch(`/api/scrape/team/${team.ncaa_team_id}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ academic_year: Number(year), division: Number(team.division||2), skip_pbp: skipPbp, name_override: nameOverride })
+    });
+    state.activeJobId = jobId;
+
+    const progWrap = document.getElementById('scrape-progress-wrap');
+    const progFill = document.getElementById('scrape-progress-fill');
+    const progText = document.getElementById('scrape-progress-text');
+    progWrap.classList.remove('hidden');
+    progFill.style.width='0%';
+
+    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    state.activeJobEs = es;
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      if (ev.type === 'progress') {
+        const pct = Math.round((ev.done/ev.total)*100);
+        progFill.style.width = pct+'%';
+        progText.textContent = `${ev.done}/${ev.total}`;
+      }
+      logLine(ev.type==='done'?'done':ev.type, ev.message||JSON.stringify(ev));
+      if (ev.type === 'done' || ev.type === 'error_fatal') {
+        btn.disabled = false;
+        es.close();
+        state.activeJobEs = null;
+        if (ev.type === 'done') progFill.style.width='100%';
+        refreshTeamSelects();
+        loadDbTeams();
+      }
+    };
+    es.onerror = () => {
+      logLine('error','Connection lost');
+      btn.disabled = false;
+      es.close();
+    };
+  } catch(e) {
+    logLine('error', e.message);
+    btn.disabled = false;
+  }
+}
+
+async function startStatsScrape() {
+  const team = state.selectedAdminTeam;
+  if (!team) return;
+  const year = document.getElementById('scrape-year').value;
+  const btn  = document.getElementById('scrape-stats-btn');
+
+  btn.disabled = true;
+  clearLog();
+  logLine('info', `Scraping batting + pitching stats: ${team.name} · ${year}`);
+
+  if (state.activeJobEs) { state.activeJobEs.close(); state.activeJobEs = null; }
+
+  try {
+    const { jobId } = await apiFetch(`/api/scrape/stats/${team.ncaa_team_id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ academic_year: Number(year) })
+    });
+    state.activeJobId = jobId;
+
+    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    state.activeJobEs = es;
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      logLine(ev.type === 'done' ? 'done' : ev.type, ev.message || JSON.stringify(ev));
+      if (ev.type === 'done' || ev.type === 'error_fatal') {
+        btn.disabled = false;
+        es.close();
+        state.activeJobEs = null;
+      }
+    };
+    es.onerror = () => {
+      logLine('error', 'Connection lost');
+      btn.disabled = false;
+      es.close();
+    };
+  } catch (e) {
+    logLine('error', e.message);
+    btn.disabled = false;
+  }
+}
+
+async function startResolveNames() {
+  const team = state.selectedAdminTeam;
+  if (!team) return;
+  const year = document.getElementById('scrape-year').value;
+  const btn  = document.getElementById('resolve-names-btn');
+
+  btn.disabled = true;
+  clearLog();
+  logLine('info', `Resolving batter names: ${team.name} · ${year}`);
+
+  if (state.activeJobEs) { state.activeJobEs.close(); state.activeJobEs = null; }
+
+  try {
+    const { jobId } = await apiFetch(`/api/scrape/resolve-names/${team.ncaa_team_id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ academic_year: Number(year) })
+    });
+    state.activeJobId = jobId;
+
+    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    state.activeJobEs = es;
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      logLine(ev.type === 'done' ? 'done' : ev.type, ev.message || JSON.stringify(ev));
+      if (ev.type === 'done' || ev.type === 'error_fatal') {
+        btn.disabled = false;
+        es.close();
+        state.activeJobEs = null;
+      }
+    };
+    es.onerror = () => {
+      logLine('error', 'Connection lost');
+      btn.disabled = false;
+      es.close();
+    };
+  } catch (e) {
+    logLine('error', e.message);
+    btn.disabled = false;
+  }
+}
+
+async function startResolvePitchers() {
+  const team = state.selectedAdminTeam;
+  if (!team) return;
+  const year = document.getElementById('scrape-year').value;
+  const btn  = document.getElementById('resolve-pitchers-btn');
+
+  btn.disabled = true;
+  clearLog();
+  logLine('info', `Resolving pitcher names: ${team.name} · ${year}`);
+
+  if (state.activeJobEs) { state.activeJobEs.close(); state.activeJobEs = null; }
+
+  try {
+    const { jobId } = await apiFetch(`/api/scrape/resolve-pitchers/${team.ncaa_team_id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ academic_year: Number(year) })
+    });
+    state.activeJobId = jobId;
+
+    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    state.activeJobEs = es;
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      logLine(ev.type === 'done' ? 'done' : ev.type, ev.message || JSON.stringify(ev));
+      if (ev.type === 'done' || ev.type === 'error_fatal') {
+        btn.disabled = false;
+        es.close();
+        state.activeJobEs = null;
+      }
+    };
+    es.onerror = () => {
+      logLine('error', 'Connection lost');
+      btn.disabled = false;
+      es.close();
+    };
+  } catch (e) {
+    logLine('error', e.message);
+    btn.disabled = false;
+  }
+}
+
+function viewScrapedTeam() {
+  const team = state.selectedAdminTeam;
+  if (!team) return;
+  const year = document.getElementById('scrape-year').value;
+  // Set scout selectors
+  document.getElementById('scout-team-sel').value = team.ncaa_team_id;
+  populateYears('scout-year-sel', Number(year));
+  showPage('scout');
+  loadScoutSchedule();
+}
+
+// ── Admin: DB Teams table ──────────────────────────────────────────────────
+async function loadDbTeams() {
+  try {
+    const teams = await apiFetch('/api/teams');
+    state.teams = teams;
+    document.getElementById('db-team-count').textContent = teams.length;
+    const tbody = document.getElementById('db-teams-tbody');
+    if (!teams.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text3)">No teams in database yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = teams.map(t=>`
+      <tr>
+        <td><span class="font-bold">${t.name}</span></td>
+        <td><span class="tag">D${t.division||'?'}</span></td>
+        <td style="color:var(--text2)">${t.conference||'—'}</td>
+        <td style="font-family:monospace;color:var(--text3);font-size:12px">${t.ncaa_team_id}</td>
+        <td style="color:var(--text3);font-size:12px">${t.last_scraped_at?fmtDate(t.last_scraped_at):'Never'}</td>
+        <td style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-secondary" onclick="quickScoutTeam(${t.ncaa_team_id})">View</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteTeam(${t.ncaa_team_id},'${t.name.replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('');
+    // Update team selects
+    const opt = teams.map(t=>`<option value="${t.ncaa_team_id}">${t.name}</option>`).join('');
+    const empty = '<option value="">— choose a team —</option>';
+
+    // Admin quick-pick dropdown — sorted alphabetically, includes division tag
+    const adminSel = document.getElementById('admin-team-sel');
+    if (adminSel) {
+      const cur = adminSel.value;
+      adminSel.innerHTML = empty + [...teams]
+        .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+        .map(t=>`<option value="${t.ncaa_team_id}">${t.name} · D${t.division||'?'}${t.conference ? ' · '+t.conference : ''}</option>`)
+        .join('');
+      if (cur) adminSel.value = cur; // preserve selection on refresh
+    }
+
+    ['scout-team-sel','pbp-team-sel','bat-team-sel','pit-team-sel','rost-team-sel'].forEach(id=>{
+      document.getElementById(id).innerHTML = empty + opt;
+    });
+    // Matchup selectors
+    const muEmpty = '<option value="">— choose —</option>';
+    document.getElementById('mu-team-a').innerHTML = muEmpty + opt;
+    document.getElementById('mu-team-b').innerHTML = muEmpty + opt;
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function deleteTeam(ncaa_team_id, name) {
+  if (!confirm(`Delete "${name}" (ID ${ncaa_team_id}) from the database?\n\nThis also removes all their games, plays, and stats.`)) return;
+  try {
+    await apiFetch(`/api/teams/${ncaa_team_id}`, { method: 'DELETE' });
+    await loadDbTeams();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
+
+function quickScoutTeam(teamId) {
+  document.getElementById('scout-team-sel').value = teamId;
+  populateYears('scout-year-sel');
+  showPage('scout');
+  scoutTeamChange();
+}
+
+// ── Scout: Schedule ────────────────────────────────────────────────────────
+function scoutTeamChange() {
+  populateYears('scout-year-sel');
+  loadScoutSchedule();
+}
+
+async function loadScoutSchedule() {
+  const teamId = document.getElementById('scout-team-sel').value;
+  const year   = document.getElementById('scout-year-sel').value;
+  if (!teamId || !year) return;
+
+  document.getElementById('scout-summary-row').classList.add('hidden');
+  document.getElementById('scout-schedule-card').classList.add('hidden');
+
+  const [summary, games] = await Promise.all([
+    apiFetch(`/api/scout/${teamId}/${year}/summary`),
+    apiFetch(`/api/scout/${teamId}/${year}/games`),
+  ]).catch(e=>{ console.error(e); return [{},{games:[]}]; });
+
+  if (summary && summary.team) {
+    document.getElementById('topbar-team-name').textContent = summary.team.name;
+    document.getElementById('topbar-season').textContent = `${year-1}–${String(year).slice(-2)} Season`;
+    document.getElementById('topbar-team').classList.remove('hidden');
+  }
+
+  if (summary && summary.summary) {
+    const s = summary.summary;
+    document.getElementById('sum-wins').textContent   = s.wins||0;
+    document.getElementById('sum-losses').textContent = s.losses||0;
+    document.getElementById('sum-rs').textContent     = s.total_runs_scored||0;
+    document.getElementById('sum-ra').textContent     = s.total_runs_allowed||0;
+    document.getElementById('scout-summary-row').classList.remove('hidden');
+  }
+
+  const tbody = document.getElementById('schedule-tbody');
+  if (!games || !games.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">No games found</td></tr>';
+  } else {
+    tbody.innerHTML = games.map(g=>`
+      <tr>
+        <td style="white-space:nowrap">${fmtDate(g.game_date)}</td>
+        <td><span class="font-bold">${g.opponent_name||'—'}</span></td>
+        <td class="center">${g.is_away?'<span class="tag away-tag">Away</span>':'<span class="tag">Home</span>'}</td>
+        <td class="center">${g.result?`<span class="pill ${g.result}">${g.result}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+        <td class="num font-bold">${g.our_score??'—'}</td>
+        <td class="num" style="color:var(--text3)">${g.opp_score??'—'}</td>
+        <td class="center">${g.pbp_scraped?'<span class="tag" style="background:#0d2a1a;color:var(--green)">✓</span>':'<span style="color:var(--text3);font-size:11px">—</span>'}</td>
+        <td>${g.pbp_scraped?`<button class="btn btn-sm btn-secondary" onclick="viewGamePbp(${g.id})">PBP</button>`:'<span style="color:var(--text3);font-size:11px">No PBP</span>'}</td>
+      </tr>`).join('');
+  }
+  document.getElementById('scout-schedule-card').classList.remove('hidden');
+}
+
+function viewGamePbp(gameId) {
+  // Switch to PBP page and pre-select this game
+  showPage('pbp');
+  // Copy team/year from scout selectors
+  const teamId = document.getElementById('scout-team-sel').value;
+  const year   = document.getElementById('scout-year-sel').value;
+  document.getElementById('pbp-team-sel').value = teamId;
+  populateYears('pbp-year-sel', Number(year));
+  loadPbpGameList().then(() => {
+    document.getElementById('pbp-game-sel').value = gameId;
+    loadPbp();
+  });
+}
+
+// ── PBP ──────────────────────────────────────────────────────────────────
+function pbpTeamChange() {
+  populateYears('pbp-year-sel');
+  loadPbpGameList();
+}
+
+async function loadPbpGameList() {
+  const teamId = document.getElementById('pbp-team-sel').value;
+  const year   = document.getElementById('pbp-year-sel').value;
+  const sel    = document.getElementById('pbp-game-sel');
+  if (!teamId || !year) { sel.innerHTML='<option value="">— select season first —</option>'; return; }
+  try {
+    const games = await apiFetch(`/api/scout/${teamId}/${year}/games`);
+    sel.innerHTML = '<option value="">— select a game —</option>' +
+      games.map(g=>`<option value="${g.id}">${fmtDate(g.game_date)} ${g.is_away?'@ ':'vs '}${g.opponent_name||'?'} — ${g.result||'?'} ${g.our_score??''}${g.our_score!=null?'-':''}${g.opp_score??''}</option>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function loadPbp() {
+  const gameId = document.getElementById('pbp-game-sel').value;
+  const panel  = document.getElementById('pbp-panel');
+  document.getElementById('pbp-empty').style.display    = 'none';
+  document.getElementById('pbp-game-header').style.display = 'none';
+  document.getElementById('pbp-card').style.display = 'none';
+  document.getElementById('pbp-scrape-btn').style.display = 'none';
+
+  if (!gameId) { document.getElementById('pbp-empty').style.display='block'; return; }
+  panel.innerHTML = '<div style="padding:20px;color:var(--text3)">Loading…</div>';
+  document.getElementById('pbp-card').style.display = 'block';
+
+  // Reset to Play Log tab
+  setPbpTab('log');
+
+  try {
+    const { game, plays } = await apiFetch(`/api/scout/game/${gameId}/plays`);
+
+    // Game header
+    const teamName = state.teams.find(t=>t.ncaa_team_id==game.ncaa_team_id)?.name || 'Our Team';
+    document.getElementById('pbp-matchup').textContent = `${game.is_away?`${teamName} @ `:''} ${game.opponent_name||'?'}${!game.is_away?' at '+teamName:''}`;
+    document.getElementById('pbp-date').textContent = fmtDate(game.game_date);
+    document.getElementById('pbp-score').textContent = `${game.our_score??'—'} – ${game.opp_score??'—'}`;
+    const rp = document.getElementById('pbp-result-pill');
+    rp.innerHTML = game.result ? `<span class="pill ${game.result}">${game.result==='W'?'Win':game.result==='L'?'Loss':'Tie'}</span>` : '';
+    document.getElementById('pbp-game-header').style.display = 'block';
+
+    if (!game.pbp_scraped || !plays.length) {
+      panel.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3)">No play-by-play data. Click "Scrape PBP" to fetch it.</div>';
+      document.getElementById('pbp-scrape-btn').style.display = 'inline-flex';
+      document.getElementById('pbp-scrape-btn').dataset.gameId = gameId;
+      document.getElementById('pbp-play-count').textContent = '0 plays';
+      state.currentPlays = [];
+      return;
+    }
+
+    state.currentPlays = plays;
+    document.getElementById('pbp-play-count').textContent = `${plays.length} plays`;
+
+    // Populate batter filter
+    const batters = [...new Set(plays.map(p=>p.batter_name).filter(Boolean))].sort();
+    const batSel = document.getElementById('spray-batter-sel');
+    batSel.innerHTML = '<option value="">All Batters</option>' +
+      batters.map(b=>`<option value="${b}">${b}</option>`).join('');
+
+    renderPbp(plays);
+  } catch(e) {
+    panel.innerHTML = `<div style="padding:16px;color:var(--red)">${e.message}</div>`;
+  }
+}
+
+function renderPbp(plays) {
+  const panel = document.getElementById('pbp-panel');
+  // Group by inning+half
+  const groups = {};
+  const order  = [];
+  for (const p of plays) {
+    const key = `${p.inning||'?'}_${p.half||'top'}`;
+    if (!groups[key]) { groups[key]={inning:p.inning,half:p.half,plays:[]}; order.push(key); }
+    groups[key].plays.push(p);
+  }
+
+  panel.innerHTML = order.map((key,gi)=>{
+    const g = groups[key];
+    const label = g.inning ? `${g.half==='bot'?'Bottom':'Top'} of ${ordinal(g.inning)}` : 'Plays';
+    const playsHtml = g.plays.map(p=>`
+      <div class="play-row">
+        <div class="play-type-badge pt-${p.play_type}">${p.play_type}</div>
+        <div class="play-text">${p.raw_text||'—'}</div>
+        ${(p.away_score_after!==null&&p.home_score_after!==null)?`<div class="play-score">${p.away_score_after}–${p.home_score_after}</div>`:''}
+      </div>`).join('');
+    return `<div class="inning-group">
+      <div class="inning-header" onclick="toggleInning('ig-${gi}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        ${label}
+        <span style="font-size:11px;color:var(--text3);margin-left:auto">${g.plays.length} plays</span>
+      </div>
+      <div class="inning-plays" id="ig-${gi}">${playsHtml}</div>
+    </div>`;
+  }).join('');
+  // Open first inning by default
+  if (order.length) document.getElementById('ig-0')?.classList.add('open');
+}
+
+function toggleInning(id) {
+  document.getElementById(id)?.classList.toggle('open');
+}
+
+function toggleAllInnings() {
+  state.allInningsOpen = !state.allInningsOpen;
+  document.querySelectorAll('.inning-plays').forEach(el=>{
+    el.classList.toggle('open', state.allInningsOpen);
+  });
+}
+
+function ordinal(n) {
+  const s=['th','st','nd','rd'];
+  const v=n%100;
+  return n+(s[(v-20)%10]||s[v]||s[0]);
+}
+
+async function scrapeSinglePbp() {
+  const gameId = document.getElementById('pbp-scrape-btn').dataset.gameId;
+  if (!gameId) return;
+  const btn = document.getElementById('pbp-scrape-btn');
+  btn.disabled = true;
+  btn.textContent = 'Scraping…';
+  try {
+    const { jobId } = await apiFetch(`/api/scrape/pbp/${gameId}`, {method:'POST'});
+    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    es.onmessage = async (e) => {
+      const ev = JSON.parse(e.data);
+      if (ev.type==='done'||ev.type==='error_fatal') {
+        es.close();
+        btn.disabled=false; btn.textContent='Scrape PBP';
+        await loadPbp();
+      }
+    };
+  } catch(e) {
+    btn.disabled=false; btn.textContent='Scrape PBP';
+    alert(e.message);
+  }
+}
+
+// ── PBP Tab switcher ──────────────────────────────────────────────────────
+function setPbpTab(tab) {
+  state.currentPbpTab = tab;
+  document.getElementById('pbp-tab-log').classList.toggle('active', tab === 'log');
+  document.getElementById('pbp-tab-spray').classList.toggle('active', tab === 'spray');
+  document.getElementById('pbp-panel').style.display = tab === 'log' ? '' : 'none';
+  document.getElementById('pbp-spray-panel').style.display = tab === 'spray' ? '' : 'none';
+  document.getElementById('pbp-expand-btn').style.display = tab === 'log' ? '' : 'none';
+  if (tab === 'spray' && state.currentPlays.length) renderSprayChart(state.currentPlays);
+}
+
+// ── Spray Chart ────────────────────────────────────────────────────────────
+const SPRAY_COLORS = {
+  single: '#22c55e', double: '#3b82f6', triple: '#a855f7',
+  hr: '#f59e0b', out: '#ef4444', error: '#f97316',
+  walk: '#06b6d4', hbp: '#06b6d4', sac: '#6b7280',
+  wp: '#6b7280', pb: '#6b7280', steal: '#6b7280',
+  caught_stealing: '#6b7280', pickoff: '#6b7280',
+  balk: '#6b7280', strikeout: '#ef4444', other: '#6b7280',
+};
+
+// Map play text → [svgX, svgY] coordinates (viewBox 0 0 460 420, HP at 230,400)
+function getPlayZone(play) {
+  // Derive zone from getHitCoords coordinates — chart dots and zone counts always agree
+  const coords = getHitCoords(play);
+  if (!coords) return null;
+  const [x, y] = coords;
+
+  if (y > 340) return 'C';
+  if (y > 290) {
+    if (x < 200) return '3B';
+    if (x > 270) return '1B';
+    return 'P';
+  }
+  if (y > 215) {
+    if (x < 215) return 'SS';
+    if (x < 260) return '2B';
+    return '1B';
+  }
+  // Outfield (includes HRs)
+  if (x < 120) return 'LF';
+  if (x < 180) return 'LCF';
+  if (x < 280) return 'CF';
+  if (x < 340) return 'RCF';
+  return 'RF';
+}
+
+function getHitCoords(play) {
+  const d = (play.raw_text || '').toLowerCase();
+
+  // Skip plays with no batted-ball location
+  const isHit    = /single|double|triple|home.?run|homered/.test(d);
+  const isBattedOut = /grounded?|flied?|lined?|popped?|bunt|sac/.test(d);
+  const isError  = /error/.test(d);
+  if (!isHit && !isBattedOut && !isError) return null;
+
+  // Home run — beyond the fence
+  if (/home.?run|homered|over the (fence|wall)|grand.?slam/.test(d)) {
+    if (/left/.test(d))   return [65, 115];
+    if (/right/.test(d))  return [395, 115];
+    return [230, 70]; // default center
+  }
+
+  // Outfield zones
+  if (/left.center|lcf/.test(d))  return [145, 120];
+  if (/right.center|rcf/.test(d)) return [315, 120];
+  if (/left\s+field|to\s+lf\b|in\s+left/.test(d))   return [100, 150];
+  if (/right\s+field|to\s+rf\b|in\s+right/.test(d))  return [360, 150];
+  if (/center\s+field|to\s+cf\b|in\s+center/.test(d)) return [230, 100];
+
+  // Infield positions
+  if (/to\s+(first|1st)\b|to\s+1b\b|first.base/.test(d))         return [305, 268];
+  if (/to\s+(second|2nd)\b|to\s+2b\b|second.base/.test(d))       return [272, 238];
+  if (/to\s+(third|3rd)\b|to\s+3b\b|third.base/.test(d))         return [155, 272];
+  if (/to\s+(short.?stop|ss)\b/.test(d))                          return [185, 255];
+  if (/to\s+(pitcher|p)\b|pitcher's\s+mound/.test(d))             return [230, 280];
+  if (/to\s+(catcher|c)\b/.test(d))                               return [230, 370];
+
+  // Directional clues without position
+  if (/pull(ed)?/.test(d)) {
+    // Need to know batter handedness — approximate with left side (most batters right-handed)
+    return [155, 230];
+  }
+  if (/oppo(site)?(site)?|oppo/.test(d)) return [305, 230];
+
+  // Bunt
+  if (/bunt/.test(d)) return [230, 325];
+
+  // Generic groundball/flyball without direction → random infield/outfield
+  return null; // not enough info
+}
+
+function renderSprayChart(plays) {
+  const wrap = document.getElementById('spray-svg-wrap');
+  if (!wrap) return;
+
+  const batterFilter = document.getElementById('spray-batter-sel').value;
+  const typeFilter   = document.getElementById('spray-type-sel').value;
+
+  const filtered = plays.filter(p => {
+    if (batterFilter && p.batter_name !== batterFilter) return false;
+    if (typeFilter   && p.play_type !== typeFilter)     return false;
+    return true;
+  });
+
+  // SVG dimensions
+  const W = 460, H = 420;
+  // Key coordinates
+  const HP  = [230, 400]; // home plate
+  const B1  = [320, 310]; // 1st base
+  const B2  = [230, 220]; // 2nd base
+  const B3  = [140, 310]; // 3rd base
+  const PIT = [230, 295]; // pitcher's mound
+
+  // Build field SVG
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:500px;display:block"
+    xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="gGrass" cx="50%" cy="80%" r="70%">
+        <stop offset="0%" stop-color="#1e4d2b"/>
+        <stop offset="100%" stop-color="#142b1a"/>
+      </radialGradient>
+      <radialGradient id="gDirt" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#6b4c1e"/>
+        <stop offset="100%" stop-color="#4a3010"/>
+      </radialGradient>
+    </defs>
+
+    <!-- Background -->
+    <rect width="${W}" height="${H}" fill="#0f1117" rx="8"/>
+
+    <!-- Fair territory grass wedge -->
+    <path d="M ${HP[0]},${HP[1]} L 28,205 A 250,250 0 0 1 432,205 Z"
+          fill="url(#gGrass)"/>
+
+    <!-- Foul lines -->
+    <line x1="${HP[0]}" y1="${HP[1]}" x2="28"  y2="205" stroke="#ffffff" stroke-width="1.5" opacity=".35"/>
+    <line x1="${HP[0]}" y1="${HP[1]}" x2="432" y2="205" stroke="#ffffff" stroke-width="1.5" opacity=".35"/>
+
+    <!-- Outfield arc -->
+    <path d="M 28,205 A 250,250 0 0 1 432,205" fill="none" stroke="#ffffff" stroke-width="1.5" opacity=".25"/>
+
+    <!-- Infield dirt circle -->
+    <circle cx="${(B1[0]+B2[0]+B3[0]+HP[0])/4}" cy="${(B1[1]+B2[1]+B3[1]+HP[1])/4}" r="95"
+            fill="url(#gDirt)" opacity=".55"/>
+
+    <!-- Diamond baselines -->
+    <polygon points="${HP[0]},${HP[1]} ${B1[0]},${B1[1]} ${B2[0]},${B2[1]} ${B3[0]},${B3[1]}"
+             fill="none" stroke="#c8a96e" stroke-width="1.5" opacity=".7"/>
+
+    <!-- Pitcher's mound -->
+    <circle cx="${PIT[0]}" cy="${PIT[1]}" r="12" fill="#8B6914" opacity=".6"/>
+    <circle cx="${PIT[0]}" cy="${PIT[1]}" r="4"  fill="#c8a96e" opacity=".8"/>
+
+    <!-- Bases -->
+    <rect x="${B2[0]-6}" y="${B2[1]-6}" width="12" height="12" fill="white" opacity=".9" transform="rotate(45,${B2[0]},${B2[1]})"/>
+    <rect x="${B1[0]-6}" y="${B1[1]-6}" width="12" height="12" fill="white" opacity=".9" transform="rotate(45,${B1[0]},${B1[1]})"/>
+    <rect x="${B3[0]-6}" y="${B3[1]-6}" width="12" height="12" fill="white" opacity=".9" transform="rotate(45,${B3[0]},${B3[1]})"/>
+
+    <!-- Home plate (pentagon) -->
+    <polygon points="${HP[0]},${HP[1]-9} ${HP[0]+7},${HP[1]-4} ${HP[0]+7},${HP[1]+5} ${HP[0]-7},${HP[1]+5} ${HP[0]-7},${HP[1]-4}"
+             fill="white" opacity=".9"/>
+
+    <!-- Position labels -->
+    <text x="${PIT[0]}" y="${PIT[1]-16}" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">P</text>
+    <text x="${B1[0]+14}" y="${B1[1]+4}" text-anchor="start"  fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">1B</text>
+    <text x="${B2[0]}"    y="${B2[1]-12}" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">2B</text>
+    <text x="${B3[0]-14}" y="${B3[1]+4}" text-anchor="end"    fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">3B</text>
+    <text x="175"  y="${(B3[1]+B2[1])/2 + 4}" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">SS</text>
+    <text x="90"   y="165" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".6" font-family="monospace">LF</text>
+    <text x="${W/2}" y="100" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".6" font-family="monospace">CF</text>
+    <text x="370"  y="165" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".6" font-family="monospace">RF</text>
+    <text x="${HP[0]}" y="${HP[1]+16}" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".6" font-family="monospace">C</text>
+`;
+
+  // Bucket plays by coordinate to add deterministic jitter when multiple land at same spot
+  const buckets = {};
+  const plotted = [];
+
+  filtered.forEach((play, idx) => {
+    const coords = getHitCoords(play);
+    if (!coords) return;
+    const key = `${Math.round(coords[0]/8)}_${Math.round(coords[1]/8)}`;
+    if (!buckets[key]) buckets[key] = 0;
+    const count = buckets[key]++;
+    // Deterministic jitter: spiral outward based on count
+    const angle  = (count * 137.5) * (Math.PI / 180); // golden angle
+    const radius = count === 0 ? 0 : 5 + Math.floor(count / 7) * 5;
+    const jx = coords[0] + Math.round(Math.cos(angle) * radius);
+    const jy = coords[1] + Math.round(Math.sin(angle) * radius);
+    plotted.push({ play, x: jx, y: jy, idx });
+  });
+
+  // Render dots
+  plotted.forEach(({ play, x, y, idx }) => {
+    const color = SPRAY_COLORS[play.play_type] || '#6b7280';
+    const label = (play.raw_text || '').replace(/"/g, '&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    svg += `<circle cx="${x}" cy="${y}" r="5" fill="${color}" opacity=".82" stroke="#0f1117" stroke-width="1"
+      class="spray-dot" data-idx="${idx}" data-text="${label}" data-type="${play.play_type}"
+      style="cursor:pointer" onmouseenter="showSprayTip(event,this)" onmouseleave="hideSprayTip()"/>`;
+  });
+
+  const located = plotted.length;
+  const skipped = filtered.length - located;
+
+  svg += `</svg>`;
+
+  wrap.innerHTML = svg;
+
+  // Stats line
+  const statsLine = document.createElement('div');
+  statsLine.style.cssText = 'font-size:11px;color:var(--text3);margin-top:6px';
+  statsLine.textContent = `${located} plays plotted${skipped ? ` · ${skipped} with no field location` : ''}`;
+  wrap.appendChild(statsLine);
+}
+
+function showSprayTip(event, el) {
+  const tip = document.getElementById('spray-tooltip');
+  const text = el.dataset.text;
+  const type = el.dataset.type;
+  tip.innerHTML = `<span style="font-weight:700;color:${SPRAY_COLORS[type]||'#fff'}">${type}</span><br>${text}`;
+  tip.style.display = 'block';
+  positionSprayTip(event);
+}
+
+function positionSprayTip(event) {
+  const tip = document.getElementById('spray-tooltip');
+  if (tip.style.display === 'none') return;
+  const x = event.clientX + 14, y = event.clientY - 10;
+  tip.style.left = Math.min(x, window.innerWidth - 260) + 'px';
+  tip.style.top  = Math.min(y, window.innerHeight - 80) + 'px';
+}
+
+function hideSprayTip() {
+  document.getElementById('spray-tooltip').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePlayerModal(); });
+document.addEventListener('mousemove', e => { if (document.getElementById('spray-tooltip').style.display !== 'none') positionSprayTip(e); });
+
+// ── Batting Stats ──────────────────────────────────────────────────────────
+function batTeamChange() { populateYears('bat-year-sel'); loadBatting(); }
+async function loadBatting() {
+  const teamId = document.getElementById('bat-team-sel').value;
+  const year   = document.getElementById('bat-year-sel').value;
+  const card   = document.getElementById('bat-card');
+  if (!teamId||!year) return;
+  card.classList.remove('hidden');
+  closePlayerModal();
+  const tbody = document.getElementById('bat-tbody');
+  tbody.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:16px;color:var(--text3)">Loading…</td></tr>';
+  try {
+    const stats = await apiFetch(`/api/scout/${teamId}/${year}/batting`);
+    if (!stats.length) { tbody.innerHTML='<tr><td colspan="20" style="text-align:center;padding:24px;color:var(--text3)">No batting stats</td></tr>'; return; }
+    state.battingStats = stats;
+    tbody.innerHTML = stats.map((s,i)=>`<tr style="cursor:pointer" onclick="showBatterProfile(${i})"
+        onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background=''">
+      <td style="color:var(--text3);font-size:12px">${s.jersey_number||'—'}</td>
+      <td class="font-bold">${s.name||'Unknown'}</td>
+      <td style="color:var(--text2)">${s.position||'—'}</td>
+      <td style="color:var(--text3)">${s.class_year||'—'}</td>
+      <td class="num">${fmtStat(s.g)}</td>
+      <td class="num">${fmtStat(s.ab)}</td>
+      <td class="num">${fmtStat(s.r)}</td>
+      <td class="num">${fmtStat(s.h)}</td>
+      <td class="num">${fmtStat(s.doubles)}</td>
+      <td class="num">${fmtStat(s.triples)}</td>
+      <td class="num">${fmtStat(s.hr)}</td>
+      <td class="num">${fmtStat(s.rbi)}</td>
+      <td class="num">${fmtStat(s.bb)}</td>
+      <td class="num">${fmtStat(s.so)}</td>
+      <td class="num">${fmtStat(s.sb)}</td>
+      <td class="num">${fmtStat(s.hbp)}</td>
+      <td class="num text-green">${fmtAvg(s.avg)}</td>
+      <td class="num">${fmtAvg(s.obp)}</td>
+      <td class="num">${fmtAvg(s.slg)}</td>
+      <td class="num text-accent">${fmtAvg(s.ops)}</td>
+    </tr>`).join('');
+  } catch(e) { tbody.innerHTML=`<tr><td colspan="20" style="color:var(--red);padding:16px">${e.message}</td></tr>`; }
+}
+
+// ── Pitching Stats ─────────────────────────────────────────────────────────
+function pitTeamChange() { populateYears('pit-year-sel'); loadPitching(); }
+async function loadPitching() {
+  const teamId = document.getElementById('pit-team-sel').value;
+  const year   = document.getElementById('pit-year-sel').value;
+  const card   = document.getElementById('pit-card');
+  if (!teamId||!year) return;
+  card.classList.remove('hidden');
+  const tbody = document.getElementById('pit-tbody');
+  tbody.innerHTML='<tr><td colspan="17" style="text-align:center;padding:16px;color:var(--text3)">Loading…</td></tr>';
+  try {
+    const stats = await apiFetch(`/api/scout/${teamId}/${year}/pitching`);
+    if (!stats.length) { tbody.innerHTML='<tr><td colspan="17" style="text-align:center;padding:24px;color:var(--text3)">No pitching stats</td></tr>'; return; }
+    tbody.innerHTML = stats.map(s=>`<tr>
+      <td style="color:var(--text3);font-size:12px">${s.jersey_number||'—'}</td>
+      <td class="font-bold">${s.name||'Unknown'}</td>
+      <td style="color:var(--text3)">${s.class_year||'—'}</td>
+      <td class="num">${fmtStat(s.g)}</td>
+      <td class="num">${fmtStat(s.gs)}</td>
+      <td class="num text-green">${fmtStat(s.w)}</td>
+      <td class="num text-red">${fmtStat(s.l)}</td>
+      <td class="num">${fmtStat(s.sv)}</td>
+      <td class="num">${fmtStat(s.ip)}</td>
+      <td class="num">${fmtStat(s.h)}</td>
+      <td class="num">${fmtStat(s.r)}</td>
+      <td class="num">${fmtStat(s.er)}</td>
+      <td class="num">${fmtStat(s.bb)}</td>
+      <td class="num">${fmtStat(s.so)}</td>
+      <td class="num">${fmtStat(s.hr)}</td>
+      <td class="num text-accent">${s.era!=null?Number(s.era).toFixed(2):'—'}</td>
+      <td class="num">${s.whip!=null?Number(s.whip).toFixed(3):'—'}</td>
+    </tr>`).join('');
+  } catch(e) { tbody.innerHTML=`<tr><td colspan="17" style="color:var(--red);padding:16px">${e.message}</td></tr>`; }
+}
+
+// ── Roster ─────────────────────────────────────────────────────────────────
+function rostTeamChange() { populateYears('rost-year-sel'); loadRoster(); }
+async function loadRoster() {
+  const teamId = document.getElementById('rost-team-sel').value;
+  const year   = document.getElementById('rost-year-sel').value;
+  const card   = document.getElementById('rost-card');
+  if (!teamId||!year) return;
+  card.classList.remove('hidden');
+  const tbody = document.getElementById('rost-tbody');
+  tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text3)">Loading…</td></tr>';
+  try {
+    const players = await apiFetch(`/api/scout/${teamId}/${year}/players`);
+    document.getElementById('rost-count').textContent = players.length;
+    if (!players.length) { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text3)">No players found</td></tr>'; return; }
+    state.rosterPlayers = players;
+    tbody.innerHTML = players.map((p,i)=>`<tr>
+      <td style="color:var(--text3);font-weight:700">${p.jersey_number||'—'}</td>
+      <td class="font-bold">${p.name||'Unknown'}</td>
+      <td>${p.position||'—'}</td>
+      <td style="color:var(--text2)">${p.class_year||'—'}</td>
+      <td style="font-family:monospace;font-size:12px;color:var(--text3)">${p.ncaa_player_id}</td>
+    </tr>`).join('');
+  } catch(e) { tbody.innerHTML=`<tr><td colspan="5" style="color:var(--red);padding:16px">${e.message}</td></tr>`; }
+}
+
+
+function buildZoneDistribution(plays) {
+  const ZONES = [
+    { key: 'LF',  label: 'LF',  color: '#22c55e' },
+    { key: 'LCF', label: 'LCF', color: '#16a34a' },
+    { key: 'CF',  label: 'CF',  color: '#3b82f6' },
+    { key: 'RCF', label: 'RCF', color: '#2563eb' },
+    { key: 'RF',  label: 'RF',  color: '#a855f7' },
+    { key: 'SS',  label: 'SS',  color: '#f97316' },
+    { key: '3B',  label: '3B',  color: '#ef4444' },
+    { key: '2B',  label: '2B',  color: '#f59e0b' },
+    { key: '1B',  label: '1B',  color: '#eab308' },
+    { key: 'P',   label: 'P',   color: '#6b7280' },
+    { key: 'C',   label: 'C',   color: '#6b7280' },
+  ];
+
+  const counts = {};
+  ZONES.forEach(z => counts[z.key] = 0);
+
+  let total = 0;
+  plays.forEach(p => {
+    const z = getPlayZone(p);
+    if (z && counts[z] !== undefined) { counts[z]++; total++; }
+  });
+
+  if (total === 0) return '';
+
+  // Group into: Outfield (LF+LCF+CF+RCF+RF) and Infield (SS+3B+2B+1B+P+C)
+  const outZones = ['LF','LCF','CF','RCF','RF'];
+  const infZones = ['3B','SS','2B','1B','P','C'];
+  const outTotal = outZones.reduce((s,k) => s + counts[k], 0);
+  const infTotal = infZones.reduce((s,k) => s + counts[k], 0);
+
+  const pct = n => total > 0 ? Math.round(n / total * 100) : 0;
+
+  const bar = (label, count, color) => {
+    if (!count) return '';
+    const p = pct(count);
+    return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+      <span style="width:28px;font-size:10px;color:var(--text3);text-align:right;flex-shrink:0">${label}</span>
+      <div style="flex:1;background:var(--surface2);border-radius:3px;height:8px;overflow:hidden">
+        <div style="width:${p}%;background:${color};height:100%;border-radius:3px;min-width:2px"></div>
+      </div>
+      <span style="width:32px;font-size:11px;color:var(--text2);flex-shrink:0">${p}%</span>
+      <span style="width:20px;font-size:10px;color:var(--text3);flex-shrink:0">(${count})</span>
+    </div>`;
+  };
+
+  const outBars = outZones.map(k => {
+    const z = ZONES.find(z => z.key === k);
+    return bar(z.label, counts[k], z.color);
+  }).join('');
+
+  const infBars = infZones.map(k => {
+    const z = ZONES.find(z => z.key === k);
+    return bar(z.label, counts[k], z.color);
+  }).join('');
+
+  return `<div style="margin:10px 0 4px;padding:10px 0 6px;border-top:1px solid var(--border)">
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div style="flex:1;min-width:160px">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">
+          Outfield — ${pct(outTotal)}% (${outTotal})
+        </div>
+        ${outBars}
+      </div>
+      <div style="flex:1;min-width:160px">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">
+          Infield — ${pct(infTotal)}% (${infTotal})
+        </div>
+        ${infBars}
+      </div>
+    </div>
+  </div>`;
+}
+
+function closePlayerModal() {
+  document.getElementById('player-modal-overlay').classList.remove('open');
+  document.querySelectorAll('#bat-tbody tr').forEach(tr => tr.style.background = '');
+}
+
+// ── Batter profile + spray chart ───────────────────────────────────────────
+async function showBatterProfile(idx) {
+  const player = state.battingStats[idx];
+  if (!player) return;
+
+  const teamId = document.getElementById('bat-team-sel').value;
+  const year   = document.getElementById('bat-year-sel').value;
+  const key    = `${teamId}_${year}`;
+
+  // Highlight row
+  document.querySelectorAll('#bat-tbody tr').forEach((tr, i) => {
+    tr.style.background = i === idx ? 'var(--surface2)' : '';
+  });
+
+  document.getElementById('player-modal-title').textContent =
+    `#${player.jersey_number||'—'} ${player.name||'Unknown'} · ${player.position||'—'} · ${player.class_year||'—'}`;
+  document.getElementById('player-modal-spray').innerHTML =
+    '<div style="padding:16px;color:var(--text3)">Loading season plays…</div>';
+  document.getElementById('player-modal-stats').innerHTML = '';
+  document.getElementById('player-modal-overlay').classList.add('open');
+
+  // Fetch + cache season plays
+  if (state.seasonPlaysKey !== key) {
+    state.seasonPlays = null;
+    try {
+      state.seasonPlays = await apiFetch(`/api/scout/${teamId}/${year}/plays`);
+      state.seasonPlaysKey = key;
+    } catch(e) {
+      document.getElementById('player-modal-spray').innerHTML =
+        `<div style="color:var(--red)">${e.message}</div>`;
+      return;
+    }
+  }
+
+  // 1. ID match (most reliable — survives name typos)
+  let plays = (state.seasonPlays || []).filter(p =>
+    player.ncaa_player_id && p.batter_player_id && p.batter_player_id === player.ncaa_player_id
+  );
+
+  // 2. Exact name match for plays without a resolved ID
+  if (!plays.length) {
+    plays = (state.seasonPlays || []).filter(p =>
+      p.batter_name && p.batter_name === player.name
+    );
+  }
+
+  // 3. Fuzzy full-name match — handles NCAA typos like "Shiffer" vs "Shiffler"
+  //    All name parts must share the same first 5 chars (case-insensitive)
+  if (!plays.length && player.name) {
+    const statParts = player.name.trim().toLowerCase().split(/\s+/);
+    plays = (state.seasonPlays || []).filter(p => {
+      if (!p.batter_name) return false;
+      const pbpParts = p.batter_name.trim().toLowerCase().split(/\s+/);
+      if (statParts.length !== pbpParts.length) return false;
+      return statParts.every((sp, i) => {
+        const pp = pbpParts[i];
+        const len = Math.min(sp.length, pp.length, 5);
+        return len >= 3 && sp.slice(0, len) === pp.slice(0, len);
+      });
+    });
+  }
+
+  // 4. Last-name-only fuzzy match — PBP often records just the surname
+  //    e.g. batter_name="Shiffler" while player.name="Nicholas Shiffler"
+  if (!plays.length && player.name) {
+    const statLast = player.name.trim().toLowerCase().split(/\s+/).pop();
+    plays = (state.seasonPlays || []).filter(p => {
+      if (!p.batter_name) return false;
+      // only apply when the play has a single-token name
+      const pbpParts = p.batter_name.trim().toLowerCase().split(/\s+/);
+      if (pbpParts.length !== 1) return false;
+      const pbpLast = pbpParts[0];
+      const len = Math.min(statLast.length, pbpLast.length, 6);
+      return len >= 4 && statLast.slice(0, len) === pbpLast.slice(0, len);
+    });
+  }
+
+
+  // Stats from scraped batting stats (ground truth)
+  const s = player;
+  const stat = (label, val) =>
+    `<span style="margin-right:20px"><span style="color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.05em">${label}</span>&nbsp;<strong>${val}</strong></span>`;
+
+  document.getElementById('player-modal-stats').innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:4px 0;font-size:13px;margin-bottom:14px;padding:10px 0;border-bottom:1px solid var(--border)">
+      ${stat('G', s.g??'\u2014')} ${stat('AB', s.ab??'\u2014')} ${stat('H', s.h??'\u2014')}
+      ${stat('2B', s.doubles??'\u2014')} ${stat('3B', s.triples??'\u2014')} ${stat('HR', s.hr??'\u2014')}
+      ${stat('RBI', s.rbi??'\u2014')} ${stat('BB', s.bb??'\u2014')} ${stat('K', s.so??'\u2014')}
+      ${stat('SB', s.sb??'\u2014')} ${stat('HBP', s.hbp??'\u2014')}
+      <span style="margin-left:8px">${stat('AVG', fmtAvg(s.avg))} ${stat('OBP', fmtAvg(s.obp))} ${stat('SLG', fmtAvg(s.slg))} ${stat('OPS', fmtAvg(s.ops))}</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:-10px;margin-bottom:10px">
+      ${buildZoneDistribution(plays)}
+      <div style="margin-top:6px;font-size:11px;color:var(--text3)">
+        ${(() => { const bip = plays.filter(p => getPlayZone(p) !== null).length; return `Spray chart &amp; zone bars: ${bip} balls in play &middot; ${plays.length} total PBP plays &middot; Stats: season-to-date scrape`; })()}
+      </div>
+    </div>`;
+
+  const wrapEl = document.getElementById('player-modal-spray');
+  if (!plays.length) {
+    wrapEl.innerHTML = '<div style="padding:16px;color:var(--text3)">No plays found for this player — try running <strong>Resolve Names</strong> first.</div>';
+    return;
+  }
+  renderSprayChartInto(plays, wrapEl);
+}
+
+function renderSprayChartInto(plays, wrapEl) {
+  const W=460, H=420;
+  const HP=[230,400], B1=[320,310], B2=[230,220], B3=[140,310], PIT=[230,295];
+  const cx = (B1[0]+B2[0]+B3[0]+HP[0])/4;
+  const cy = (B1[1]+B2[1]+B3[1]+HP[1])/4;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:500px;display:block" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="pg2" cx="50%" cy="80%" r="70%">
+        <stop offset="0%" stop-color="#1e4d2b"/><stop offset="100%" stop-color="#142b1a"/>
+      </radialGradient>
+      <radialGradient id="pd2" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#6b4c1e"/><stop offset="100%" stop-color="#4a3010"/>
+      </radialGradient>
+    </defs>
+    <rect width="${W}" height="${H}" fill="#0f1117" rx="8"/>
+    <path d="M ${HP[0]},${HP[1]} L 28,205 A 250,250 0 0 1 432,205 Z" fill="url(#pg2)"/>
+    <line x1="${HP[0]}" y1="${HP[1]}" x2="28"  y2="205" stroke="#fff" stroke-width="1.5" opacity=".35"/>
+    <line x1="${HP[0]}" y1="${HP[1]}" x2="432" y2="205" stroke="#fff" stroke-width="1.5" opacity=".35"/>
+    <path d="M 28,205 A 250,250 0 0 1 432,205" fill="none" stroke="#fff" stroke-width="1.5" opacity=".25"/>
+    <circle cx="${cx}" cy="${cy}" r="95" fill="url(#pd2)" opacity=".55"/>
+    <polygon points="${HP[0]},${HP[1]} ${B1[0]},${B1[1]} ${B2[0]},${B2[1]} ${B3[0]},${B3[1]}" fill="none" stroke="#c8a96e" stroke-width="1.5" opacity=".7"/>
+    <circle cx="${PIT[0]}" cy="${PIT[1]}" r="12" fill="#8B6914" opacity=".6"/>
+    <circle cx="${PIT[0]}" cy="${PIT[1]}" r="4"  fill="#c8a96e" opacity=".8"/>
+    <rect x="${B2[0]-6}" y="${B2[1]-6}" width="12" height="12" fill="white" opacity=".9" transform="rotate(45,${B2[0]},${B2[1]})"/>
+    <rect x="${B1[0]-6}" y="${B1[1]-6}" width="12" height="12" fill="white" opacity=".9" transform="rotate(45,${B1[0]},${B1[1]})"/>
+    <rect x="${B3[0]-6}" y="${B3[1]-6}" width="12" height="12" fill="white" opacity=".9" transform="rotate(45,${B3[0]},${B3[1]})"/>
+    <polygon points="${HP[0]},${HP[1]-9} ${HP[0]+7},${HP[1]-4} ${HP[0]+7},${HP[1]+5} ${HP[0]-7},${HP[1]+5} ${HP[0]-7},${HP[1]-4}" fill="white" opacity=".9"/>
+    <text x="${PIT[0]}" y="${PIT[1]-16}" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">P</text>
+    <text x="${B1[0]+14}" y="${B1[1]+4}" text-anchor="start" fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">1B</text>
+    <text x="${B2[0]}" y="${B2[1]-12}" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">2B</text>
+    <text x="${B3[0]-14}" y="${B3[1]+4}" text-anchor="end" fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">3B</text>
+    <text x="175" y="${(B3[1]+B2[1])/2+4}" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".7" font-family="monospace">SS</text>
+    <text x="90" y="165" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".6" font-family="monospace">LF</text>
+    <text x="${W/2}" y="100" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".6" font-family="monospace">CF</text>
+    <text x="370" y="165" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".6" font-family="monospace">RF</text>
+    <text x="${HP[0]}" y="${HP[1]+16}" text-anchor="middle" fill="#c8a96e" font-size="9" opacity=".6" font-family="monospace">C</text>`;
+
+  const buckets = {}, plotted = [];
+  plays.forEach((play, idx) => {
+    const coords = getHitCoords(play);
+    if (!coords) return;
+    const bk = `${Math.round(coords[0]/8)}_${Math.round(coords[1]/8)}`;
+    if (!buckets[bk]) buckets[bk] = 0;
+    const count  = buckets[bk]++;
+    const angle  = (count * 137.5) * (Math.PI / 180);
+    const radius = count === 0 ? 0 : 5 + Math.floor(count/7)*5;
+    plotted.push({ play, x: coords[0]+Math.round(Math.cos(angle)*radius), y: coords[1]+Math.round(Math.sin(angle)*radius), idx });
+  });
+
+  plotted.forEach(({play,x,y,idx}) => {
+    const color = SPRAY_COLORS[play.play_type]||'#6b7280';
+    const label = (play.raw_text||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    svg += `<circle cx="${x}" cy="${y}" r="5" fill="${color}" opacity=".82" stroke="#0f1117" stroke-width="1" class="spray-dot" data-idx="${idx}" data-text="${label}" data-type="${play.play_type}" style="cursor:pointer" onmouseenter="showSprayTip(event,this)" onmouseleave="hideSprayTip()"/>`;
+  });
+
+  svg += `</svg>`;
+  wrapEl.innerHTML = svg;
+
+  const info = document.createElement('div');
+  info.style.cssText = 'font-size:11px;color:var(--text3);margin-top:6px';
+  const skipped = plays.length - plotted.length;
+  info.textContent = `${plotted.length} plays plotted${skipped ? ` · ${skipped} with no field location` : ''}`;
+  wrapEl.appendChild(info);
+}
+
+// ── Matchup ────────────────────────────────────────────────────────────────
+
+// ── Roster-based batter filtering ──────────────────────────────────────────
+// Prevents wrong-team players from appearing on a batting tab even when
+// batting_team_id attribution is corrupt (e.g. all plays stored as half='top').
+
+function buildRosterEntries(players) {
+  if (!players || !players.length) return [];
+  return players.map(p => {
+    const full  = (p.name || '').trim().toLowerCase();
+    const parts = full.split(/\s+/);
+    return { full, parts, last: parts[parts.length - 1] };
+  });
+}
+
+// Returns true if batterName fuzzy-matches any player in rosterEntries.
+function isBatterOnTeam(batterName, rosterEntries) {
+  if (!rosterEntries.length || !batterName) return false;
+  const bName  = batterName.trim().toLowerCase();
+  const bParts = bName.split(/\s+/);
+  const bLast  = bParts[bParts.length - 1];
+
+  for (const r of rosterEntries) {
+    // 1. Exact
+    if (r.full === bName) return true;
+
+    // 2. All parts share 5-char prefix (handles minor typos)
+    if (r.parts.length === bParts.length) {
+      const allMatch = r.parts.every((rp, i) => {
+        const bp = bParts[i];
+        const len = Math.min(rp.length, bp.length, 5);
+        return len >= 3 && rp.slice(0, len) === bp.slice(0, len);
+      });
+      if (allMatch) return true;
+    }
+
+    // 3. Single-token batter name matches roster last name (PBP often drops first name)
+    if (bParts.length === 1) {
+      const len = Math.min(r.last.length, bName.length, 6);
+      if (len >= 4 && r.last.slice(0, len) === bName.slice(0, len)) return true;
+    }
+
+    // 4. Multi-token: last name matches roster last name (first names sometimes differ)
+    if (bParts.length > 1) {
+      const len = Math.min(r.last.length, bLast.length, 6);
+      if (len >= 5 && r.last.slice(0, len) === bLast.slice(0, len)) return true;
+    }
+  }
+  return false;
+}
+
+const PA_TYPES  = new Set(['single','double','triple','hr','strikeout','walk','hbp','out','error','sac','other']);
+const HIT_TYPES = new Set(['single','double','triple','hr']);
+const AB_TYPES  = new Set(['single','double','triple','hr','strikeout','out','error','other']);
+
+function muStats(plays) {
+  let pa=0, ab=0, h=0, doubles=0, triples=0, hr=0, bb=0, so=0, hbp=0;
+  for (const p of plays) {
+    if (!PA_TYPES.has(p.play_type)) continue;
+    pa++;
+    if (AB_TYPES.has(p.play_type))  ab++;
+    if (HIT_TYPES.has(p.play_type)) h++;
+    if (p.play_type === 'double')   doubles++;
+    if (p.play_type === 'triple')   triples++;
+    if (p.play_type === 'hr')       hr++;
+    if (p.play_type === 'walk')     bb++;
+    if (p.play_type === 'strikeout') so++;
+    if (p.play_type === 'hbp')      hbp++;
+  }
+  const avg  = ab > 0 ? (h/ab).toFixed(3).replace(/^0/,'') : '---';
+  const kpct = pa > 0 ? Math.round(so/pa*100)+'%' : '---';
+  return { pa, ab, h, doubles, triples, hr, bb, so, hbp, avg, kpct };
+}
+
+let muData = null;    // { teamA, teamB, plays }
+let muActiveTab = 'a'; // 'a' or 'b'
+
+async function loadMatchup() {
+  const teamA = document.getElementById('mu-team-a').value;
+  const teamB = document.getElementById('mu-team-b').value;
+  const year  = document.getElementById('mu-year').value;
+  if (!teamA || !teamB) { alert('Choose both teams first.'); return; }
+  if (teamA === teamB) { alert('Choose two different teams.'); return; }
+
+  document.getElementById('mu-empty').textContent = 'Loading…';
+  document.getElementById('mu-results').style.display = 'none';
+
+  try {
+    const [matchupData, rosterA, rosterB] = await Promise.all([
+      apiFetch(`/api/matchup?team_a=${teamA}&team_b=${teamB}&year=${year}`),
+      apiFetch(`/api/scout/${teamA}/${year}/players`).catch(() => []),
+      apiFetch(`/api/scout/${teamB}/${year}/players`).catch(() => []),
+    ]);
+    muData = { ...matchupData, rosterA, rosterB };
+    muActiveTab = 'a';
+    renderMuTab();
+    document.getElementById('mu-empty').style.display = 'none';
+    document.getElementById('mu-results').style.display = '';
+  } catch(e) {
+    document.getElementById('mu-empty').textContent = 'Error: ' + e.message;
+  }
+}
+
+function showMuTab(side) {
+  muActiveTab = side;
+  renderMuTab();
+}
+
+function renderMuTab() {
+  if (!muData) return;
+  const { teamA, teamB, plays } = muData;
+
+  const battingTeamId  = muActiveTab === 'a' ? Number(teamA.ncaa_team_id) : Number(teamB.ncaa_team_id);
+  const pitchingTeamId = muActiveTab === 'a' ? Number(teamB.ncaa_team_id) : Number(teamA.ncaa_team_id);
+  const battingName    = muActiveTab === 'a' ? teamA.name : teamB.name;
+  const pitchingName   = muActiveTab === 'a' ? teamB.name : teamA.name;
+
+  // Style tabs
+  const tabA = document.getElementById('mu-tab-a');
+  const tabB = document.getElementById('mu-tab-b');
+  tabA.textContent = (teamA ? teamA.name : 'Team A') + ' Batting';
+  tabB.textContent = (teamB ? teamB.name : 'Team B') + ' Batting';
+  tabA.style.borderBottomColor = muActiveTab === 'a' ? 'var(--accent)' : 'transparent';
+  tabA.style.color = muActiveTab === 'a' ? 'var(--accent)' : 'var(--text2)';
+  tabA.style.fontWeight = muActiveTab === 'a' ? '600' : '400';
+  tabB.style.borderBottomColor = muActiveTab === 'b' ? 'var(--accent)' : 'transparent';
+  tabB.style.color = muActiveTab === 'b' ? 'var(--accent)' : 'var(--text2)';
+  tabB.style.fontWeight = muActiveTab === 'b' ? '600' : '400';
+
+  // Determine which plays belong to each side.
+  // batting_team_id from SQL is reliable only when opponent_team_id is stored on the game.
+  // Fallback: derive from half + is_away (game is stored from game_team_id's perspective).
+  const aTeamId = Number(teamA.ncaa_team_id);
+  const bTeamId = Number(teamB.ncaa_team_id);
+
+  function playBattingTeam(p) {
+    const btid = Number(p.batting_team_id);
+    if (btid === aTeamId || btid === bTeamId) return btid; // SQL computed it correctly
+
+    // Fallback: game_team_id is the team that "owns" the game record.
+    // Away team bats TOP, home team bats BOTTOM.
+    const gid = Number(p.game_team_id);
+    const isAway = p.is_away === true || p.is_away === 't' || p.is_away === 'true';
+    const trackedTeamBats =
+      (p.half === 'top' && isAway) || (p.half === 'bot' && !isAway);
+    return trackedTeamBats ? gid : (gid === aTeamId ? bTeamId : aTeamId);
+  }
+
+  const sidePlays = plays.filter(p => playBattingTeam(p) === battingTeamId);
+
+  // Count unique games
+  const gameIds = new Set(sidePlays.map(p => p.game_id));
+  const totalPA = sidePlays.filter(p => PA_TYPES.has(p.play_type)).length;
+  document.getElementById('mu-summary').textContent =
+    `${battingName} batting vs ${pitchingName} pitching · ${gameIds.size} game${gameIds.size!==1?'s':''} · ${totalPA} plate appearances`;
+
+  if (sidePlays.length === 0) {
+    document.getElementById('mu-tbody').innerHTML =
+      `<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--text3)">No head-to-head PBP data found. Make sure both teams have been scraped and Resolve Names has been run.</td></tr>`;
+    return;
+  }
+
+  // Roster-based sanity filter:
+  // Build lookup entries for both teams so we can exclude players who are clearly
+  // on the pitching team's roster but NOT on the batting team's roster.
+  // This corrects wrong-tab attribution caused by corrupt half='top' data in the DB.
+  const battingRoster  = buildRosterEntries(muActiveTab === 'a' ? muData.rosterA : muData.rosterB);
+  const pitchingRoster = buildRosterEntries(muActiveTab === 'a' ? muData.rosterB : muData.rosterA);
+  const hasRosterData  = battingRoster.length > 0 || pitchingRoster.length > 0;
+
+  // Group by batter, filtering out wrong-team players
+  const batterMap = new Map();
+  for (const p of sidePlays) {
+    if (hasRosterData && p.batter_name) {
+      const onBatting  = isBatterOnTeam(p.batter_name, battingRoster);
+      const onPitching = isBatterOnTeam(p.batter_name, pitchingRoster);
+      // Exclude only if clearly on the pitching team AND not on the batting team.
+      // If neither roster matches, include the player (fail-open).
+      if (onPitching && !onBatting) continue;
+    }
+    const key = p.batter_player_id || ('__' + p.batter_name);
+    if (!batterMap.has(key)) batterMap.set(key, { name: p.batter_name, plays: [] });
+    batterMap.get(key).plays.push(p);
+  }
+
+  // Group each batter's plays by pitcher
+  const batters = [];
+  for (const [, b] of batterMap) {
+    const pitcherMap = new Map();
+    for (const p of b.plays) {
+      const pKey = p.pitcher_player_id || ('__' + (p.pitcher_name || 'Unknown'));
+      if (!pitcherMap.has(pKey)) pitcherMap.set(pKey, { name: p.pitcher_name || 'Unknown', plays: [] });
+      pitcherMap.get(pKey).plays.push(p);
+    }
+    const pitchers = [...pitcherMap.values()].sort((a,b) => b.plays.length - a.plays.length);
+    const totals = muStats(b.plays);
+    batters.push({ name: b.name, plays: b.plays, pitchers, totals });
+  }
+  // Sort by PA desc
+  batters.sort((a,b) => b.totals.pa - a.totals.pa);
+
+  // Build table
+  const statCells = (s) =>
+    `<td class="num">${s.pa}</td><td class="num">${s.ab}</td><td class="num">${s.h}</td>` +
+    `<td class="num">${s.doubles||0}</td><td class="num">${s.triples||0}</td><td class="num">${s.hr}</td>` +
+    `<td class="num">${s.bb}</td><td class="num">${s.so}</td>` +
+    `<td class="num" style="font-weight:600;color:${s.ab>0&&s.h/s.ab>=.300?'var(--green)':s.ab>0&&s.h/s.ab<.200?'var(--red)':'inherit'}">${s.avg}</td>` +
+    `<td class="num" style="color:${s.pa>0&&s.so/s.pa>=.3?'var(--red)':'inherit'}">${s.kpct}</td>`;
+
+  let rows = '';
+  batters.forEach((batter, bi) => {
+    const expanded = muExpandedRows.has(bi);
+    const toggleIcon = expanded ? '▼' : '▶';
+    rows += `<tr class="mu-batter-row" onclick="toggleMuBatter(${bi})">
+      <td style="color:var(--text3);font-size:11px">${toggleIcon}</td>
+      <td style="font-weight:600">${batter.name || 'Unknown'}</td>
+      ${statCells(batter.totals)}
+    </tr>`;
+    if (expanded) {
+      batter.pitchers.forEach(pitcher => {
+        const ps = muStats(pitcher.plays);
+        rows += `<tr class="mu-pitcher-row">
+          <td></td>
+          <td style="padding-left:24px;color:var(--text3)">vs ${pitcher.name}</td>
+          ${statCells(ps)}
+        </tr>`;
+      });
+    }
+  });
+
+  document.getElementById('mu-tbody').innerHTML = rows;
+
+  // Store batters for spray chart click
+  window._muBatters = batters;
+}
+
+const muExpandedRows = new Set();
+function toggleMuBatter(idx) {
+  if (muExpandedRows.has(idx)) {
+    muExpandedRows.delete(idx);
+  } else {
+    muExpandedRows.add(idx);
+  }
+  renderMuTab();
+}
+
+// ── H2H Re-scrape ──────────────────────────────────────────────────────────
+function showMuScrapePanel() {
+  const panel = document.getElementById('mu-scrape-panel');
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+}
+
+async function startH2hScrape() {
+  const teamA = document.getElementById('mu-team-a').value;
+  const teamB = document.getElementById('mu-team-b').value;
+  const year  = document.getElementById('mu-year').value;
+  if (!teamA || !teamB) { alert('Choose both teams first, then click Re-scrape H2H.'); return; }
+
+  const btn = document.getElementById('mu-scrape-btn');
+  const logEl = document.getElementById('mu-scrape-log');
+  btn.disabled = true;
+  logEl.style.display = 'block';
+  logEl.innerHTML = '';
+
+  const muLog = (type, msg) => {
+    const d = document.createElement('div');
+    d.className = `log-line log-${type}`;
+    d.textContent = `${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'})} ${msg}`;
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+
+  muLog('info', `Re-scraping H2H PBP for year ${year}…`);
+
+  try {
+    const { jobId } = await apiFetch('/api/scrape/h2h-pbp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team_a: teamA, team_b: teamB, academic_year: Number(year) }),
+    });
+
+    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      muLog(ev.type === 'done' ? 'done' : ev.type, ev.message || JSON.stringify(ev));
+      if (ev.type === 'done' || ev.type === 'error_fatal') {
+        btn.disabled = false;
+        es.close();
+        // Auto-reload matchup data if both teams are selected
+        if (teamA && teamB) loadMatchup();
+      }
+    };
+    es.onerror = () => {
+      muLog('error', 'Connection lost');
+      btn.disabled = false;
+      es.close();
+    };
+  } catch(e) {
+    muLog('error', e.message);
+    btn.disabled = false;
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+(async function init() {
+  // Populate all year selectors with defaults
+  ['scrape-year','scout-year-sel','pbp-year-sel','bat-year-sel','pit-year-sel','rost-year-sel','mu-year'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) populateYears(id);
+  });
+
+  // Restore admin session if token was saved
+  if (isAdminAuthed()) {
+    document.getElementById('nav-admin').style.display = 'flex';
+  }
+
+  // Start on scout page for non-admins, admin page for admins
+  if (isAdminAuthed()) {
+    showPage('admin');
+  } else {
+    showPage('scout');
+    // Make schedule the active nav
+    document.getElementById('nav-scout').classList.add('active');
+    document.getElementById('nav-admin').classList.remove('active');
+  }
+
+  await loadDbTeams();
+})();
+</script>
+
+<div id="player-modal-overlay" onclick="if(event.target===this)closePlayerModal()">
+  <div id="player-modal">
+    <button id="player-modal-close" onclick="closePlayerModal()">&#x2715;</button>
+    <div id="player-modal-title"></div>
+    <div id="player-modal-stats"></div>
+    <div id="player-modal-spray"></div>
+  </div>
+</div>
+
+<!-- Admin password modal -->
+<div id="admin-lock-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius2);padding:32px;width:320px;max-width:90vw">
+    <div style="font-size:20px;margin-bottom:6px;text-align:center">🔒</div>
+    <div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:4px">Admin Access</div>
+    <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:20px">Enter the admin password to continue</div>
+    <input type="password" id="admin-pw-input" placeholder="Password"
+      style="width:100%;margin-bottom:10px;font-size:14px"
+      onkeydown="if(event.key==='Enter')adminLogin()">
+    <div id="admin-pw-error" style="font-size:12px;color:var(--red);min-height:18px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('admin-lock-modal').style.display='none'">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="adminLogin()">Unlock</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

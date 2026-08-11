@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ncaa-scout
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=optional
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "1"
+      - key: DATABASE_URL
+        sync: false   # set this in the Render dashboard — paste your Neon connection string
+      - key: ADMIN_PASSWORD
+        sync: false   # set this in the Render dashboard
