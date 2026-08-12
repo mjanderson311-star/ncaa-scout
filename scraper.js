@@ -1645,6 +1645,27 @@ function lastFirstToFirstLast(name) {
   return first ? `${first} ${last}` : last;
 }
 
+// Try plain HTTP first (no browser needed), fall back to headless Chrome if the page
+// comes back empty — situational_stats pages appear to be server-rendered on NCAA's end.
+async function fetchSituationalHTML(url) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': UA,
+        'Accept': 'text/html,application/xhtml+xml,*/*',
+        'Referer': BASE,
+      },
+      timeout: 15000,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+    // If a real data table is present we're done — no browser needed
+    if (html.includes('<table') && html.includes('<tbody')) return html;
+  } catch (e) { /* fall through to browser */ }
+  // Fall back to headless Chrome
+  return fetchHTMLWithBrowser(url, { waitForSelector: 'table' });
+}
+
 async function scrapeSituationalHitting(ncaa_team_id, academic_year, emit = null) {
   // Load the roster for name matching
   const players = await db.getPlayers(ncaa_team_id, academic_year);
@@ -1668,7 +1689,7 @@ async function scrapeSituationalHitting(ncaa_team_id, academic_year, emit = null
 
     let html;
     try {
-      html = await fetchHTML(url, { waitForSelector: 'table' });
+      html = await fetchSituationalHTML(url);
     } catch (e) {
       emit && emit({ type: 'warn', message: `Could not fetch contest ${game.contest_id}: ${e.message}` });
       skipped++;
