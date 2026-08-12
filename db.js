@@ -756,7 +756,7 @@ async function getSituationalHitting(ncaa_team_id, academic_year, contest_id = n
 async function getSituationalHittingRollup(ncaa_team_id, academic_year) {
   const { rows } = await pool.query(`
     SELECT
-      player_name, ncaa_player_id, position,
+      player_name, ncaa_player_id,
       COUNT(DISTINCT contest_id) AS games,
       SUM(with_runners_h) AS with_runners_h,   SUM(with_runners_ab) AS with_runners_ab,
       SUM(scorepos_h) AS scorepos_h,           SUM(scorepos_ab) AS scorepos_ab,
@@ -773,10 +773,17 @@ async function getSituationalHittingRollup(ncaa_team_id, academic_year) {
       SUM(bases_loaded_h) AS bases_loaded_h,   SUM(bases_loaded_ab) AS bases_loaded_ab
     FROM ncaa_situational_hitting
     WHERE ncaa_team_id=$1 AND academic_year=$2
-    GROUP BY player_name, ncaa_player_id, position
+    GROUP BY player_name, ncaa_player_id
     ORDER BY player_name
   `, [ncaa_team_id, academic_year]);
   return rows;
+}
+
+async function clearSituationalHitting(ncaa_team_id, academic_year) {
+  await pool.query(
+    'DELETE FROM ncaa_situational_hitting WHERE ncaa_team_id=$1 AND academic_year=$2',
+    [ncaa_team_id, academic_year]
+  );
 }
 
 module.exports = {
@@ -798,6 +805,7 @@ module.exports = {
   upsertBattingStats, upsertPitchingStats, getBattingStats, getPitchingStats,
   // situational hitting
   upsertSituationalHitting, getSituationalHitting, getSituationalHittingRollup,
+  clearSituationalHitting,
   // matchup
   getMatchupPlays,
   // h2h

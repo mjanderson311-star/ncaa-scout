@@ -1627,6 +1627,11 @@ async function scrapeSeasonToDateStats(ncaa_team_id, academic_year, emit = null)
 // GET /contests/:contest_id/situational_stats
 // Scrapes the situational hitting table for ncaa_team_id and saves per-game rows.
 
+// ─── Situational hitting scraper ───────────────────────────────────────────
+// GET /teams/:ncaa_team_id/situational_stats
+// Scrapes the season situational hitting table (per player) and saves one row
+// per player using contest_id = 0 as a sentinel for "season totals".
+
 function parseHAB(cell) {
   // Parse "H-AB" string like "2-7" into { h: 2, ab: 7 }. Returns zeros for empty/missing.
   const s = (cell || '').trim();
@@ -1635,7 +1640,7 @@ function parseHAB(cell) {
   return { h: parseInt(m[1], 10), ab: parseInt(m[2], 10) };
 }
 
-// Convert "LastName, FirstName" → "FirstName LastName" for roster lookup
+// Convert "LastName, FirstName" to "FirstName LastName" for roster lookup
 function lastFirstToFirstLast(name) {
   if (!name) return '';
   const comma = name.indexOf(',');
@@ -1645,153 +1650,154 @@ function lastFirstToFirstLast(name) {
   return first ? `${first} ${last}` : last;
 }
 
-// Try plain HTTP first (no browser needed), fall back to headless Chrome if the page
-// comes back empty — situational_stats pages appear to be server-rendered on NCAA's end.
-async function fetchSituationalHTML(url) {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': UA,
-        'Accept': 'text/html,application/xhtml+xml,*/*',
-        'Referer': BASE,
-      },
-      timeout: 15000,
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
-    // If a real data table is present we're done — no browser needed
-    if (html.includes('<table') && html.includes('<tbody')) return html;
-  } catch (e) { /* fall through to browser */ }
-  // Fall back to headless Chrome
-  return fetchHTMLWithBrowser(url, { waitForSelector: 'table' });
-}
-
 async function scrapeSituationalHitting(ncaa_team_id, academic_year, emit = null) {
-  // Load the roster for name matching
+  const log = (type, msg) => { emit && emit({ type, message: msg }); console.log(`[${type}] ${msg}`); };
+
+  // Situational stats live at /contests/{game_contest_id}/situational_stats — one page per game.
+  // Each page has two sections: "{TeamName} Hitting" and "{OpponentName} Hitting".
+  // We identify our table by finding the heading that contains our team name.
+
+  const team = await db.getTeam(ncaa_team_id);
+  const teamName = (team && team.name) ? team.name.toLowerCase() : '';
+
   const players = await db.getPlayers(ncaa_team_id, academic_year);
   const rosterIdx = buildRosterIndex(players);
 
-  // Load team name so we can identify the right half of the page
-  const team = await db.getTeam(ncaa_team_id);
-  const teamNameLower = (team?.name || '').toLowerCase();
-
-  // Get all games with a contest_id for this team/year
   const games = await db.getGames(ncaa_team_id, academic_year);
-  const scrapable = games.filter(g => g.contest_id);
+  const gamesWithId = games.filter(g => g.contest_id);
 
-  emit && emit({ type: 'info', message: `Situational hitting: ${scrapable.length} games to scrape` });
+  if (!gamesWithId.length) {
+    log('error', 'No games with contest IDs found — scrape the schedule first');
+    emit && emit({ type: 'done', message: 'No games found — run Scrape Team first to get schedule' });
+    return;
+  }
 
-  let scraped = 0, skipped = 0;
+  log('info', `Clearing existing situational data for team ${ncaa_team_id} / ${academic_year}`);
+  try {
+    await db.clearSituationalHitting(ncaa_team_id, academic_year);
+  } catch (e) {
+    log('warn', `Could not clear old rows: ${e.message}`);
+  }
 
-  for (const game of scrapable) {
+  log('info', `Scraping situational stats for ${gamesWithId.length} games...`);
+
+  let totalSaved = 0;
+  let gamesScraped = 0;
+
+  function parseGameTable($, targetTable, contest_id) {
+    let saved = 0;
+    $(targetTable).find('tbody tr').each((_i, tr) => {
+      const cells = $(tr).find('td');
+      if (cells.length < 10) return;
+
+      const rawName = $(cells.get(0)).text().trim();
+      if (!rawName) return;
+      const nameLower = rawName.toLowerCase();
+      if (nameLower.includes('total') || nameLower.includes('team')) return;
+
+      const position = $(cells.get(1)).text().trim() || null;
+      const c = (i) => $(cells.get(i)).text().trim();
+      const wr  = parseHAB(c(2));  const sp  = parseHAB(c(3));
+      const lhp = parseHAB(c(4));  const rhp = parseHAB(c(5));
+      const lo  = parseHAB(c(6));  const r3  = parseHAB(c(7));
+      const ph  = parseHAB(c(8));  const ao  = parseHAB(c(9));
+      const two = parseHAB(c(10)); const wr2 = parseHAB(c(11));
+      const sp2 = parseHAB(c(12)); const be  = parseHAB(c(13));
+      const bl  = parseHAB(c(14));
+
+      const firstLast = lastFirstToFirstLast(rawName);
+      const matched   = lookupInRoster(firstLast, rosterIdx);
+      // Use roster canonical name if matched, otherwise use converted name
+      const playerName = matched ? matched.name : (firstLast || rawName);
+
+      db.upsertSituationalHitting({
+        ncaa_team_id, contest_id, academic_year,
+        player_name:    playerName,
+        ncaa_player_id: matched ? matched.ncaa_player_id || null : null,
+        position,
+        with_runners_h: wr.h,  with_runners_ab: wr.ab,
+        scorepos_h:     sp.h,  scorepos_ab:     sp.ab,
+        vs_lhp_h:       lhp.h, vs_lhp_ab:       lhp.ab,
+        vs_rhp_h:       rhp.h, vs_rhp_ab:       rhp.ab,
+        leadoff_h:      lo.h,  leadoff_ab:       lo.ab,
+        rbi_3rd_h:      r3.h,  rbi_3rd_ab:       r3.ab,
+        pinch_hit_h:    ph.h,  pinch_hit_ab:     ph.ab,
+        adv_outs_h:     ao.h,  adv_outs_ab:      ao.ab,
+        two_outs_h:     two.h, two_outs_ab:      two.ab,
+        runners2_h:     wr2.h, runners2_ab:      wr2.ab,
+        scorepos2_h:    sp2.h, scorepos2_ab:     sp2.ab,
+        bases_empty_h:  be.h,  bases_empty_ab:   be.ab,
+        bases_loaded_h: bl.h,  bases_loaded_ab:  bl.ab,
+      }).catch(e => log('warn', `upsert failed for ${rawName} (contest ${contest_id}): ${e.message}`));
+
+      saved++;
+    });
+    return saved;
+  }
+
+  for (const game of gamesWithId) {
     const url = `${BASE}/contests/${game.contest_id}/situational_stats`;
-    emit && emit({ type: 'info', message: `Fetching ${url}` });
+    log('info', `Game ${gamesScraped + 1}/${gamesWithId.length}: ${url}`);
 
     let html;
     try {
-      html = await fetchSituationalHTML(url);
+      html = await fetchHTML(url);
     } catch (e) {
-      emit && emit({ type: 'warn', message: `Could not fetch contest ${game.contest_id}: ${e.message}` });
-      skipped++;
+      log('warn', `Fetch failed for contest ${game.contest_id}: ${e.message}`);
+      gamesScraped++;
       continue;
     }
 
     const $ = cheerio.load(html);
 
-    // The page has two side-by-side hitting panels. Find the one whose heading
-    // contains our team name.
+    // Each page has a labeled section per team: find the one whose heading matches our team name.
+    // The heading (e.g. "Holy Family Hitting") precedes the table as a sibling or nearby element.
     let targetTable = null;
-    $('table').each((_i, tbl) => {
-      // Look for a nearby heading (h3, h4, or strong) that contains our team name
-      const heading = $(tbl).closest('[class*="col"]').find('h3,h4,h5,strong').first().text().toLowerCase();
-      if (heading.includes(teamNameLower) || (teamNameLower && heading.includes(teamNameLower.split(' ')[0]))) {
-        targetTable = tbl;
-        return false; // break
-      }
+
+    // Strategy: walk all headings/labels that contain "hitting"; pick the one matching our team name
+    const headingEls = $('*').filter((_i, el) => {
+      const txt = $(el).text().trim().toLowerCase();
+      return txt.includes('hitting') && txt.length < 80;
     });
 
-    // Fallback: use the first table if we couldn't identify by heading
+    headingEls.each((_i, el) => {
+      const txt = $(el).text().trim().toLowerCase();
+      // Check if this heading belongs to our team
+      const isOurTeam = teamName && txt.includes(teamName.split(' ')[0].toLowerCase());
+      if (!isOurTeam) return;
+      // Find the next table sibling or the first table within the parent container
+      let tbl = $(el).next('table').get(0);
+      if (!tbl) tbl = $(el).nextAll('table').first().get(0);
+      if (!tbl) tbl = $(el).parent().find('table').first().get(0);
+      if (tbl) { targetTable = tbl; return false; }
+    });
+
+    // Fallback: first table with enough rows (page is two-column, left = home/visitor)
     if (!targetTable) {
-      targetTable = $('table').first().get(0);
+      $('table').each((_i, tbl) => {
+        if ($(tbl).find('tbody tr').length > 1) { targetTable = tbl; return false; }
+      });
     }
 
     if (!targetTable) {
-      emit && emit({ type: 'warn', message: `No table found for contest ${game.contest_id}` });
-      skipped++;
+      log('warn', `No table found for contest ${game.contest_id} — skipping`);
+      gamesScraped++;
       continue;
     }
 
-    const rows = $(targetTable).find('tbody tr');
-    let saved = 0;
+    if (gamesScraped === 0) {
+      const headerCells = $(targetTable).find('thead th, thead td').map((_, th) => $(th).text().trim()).get();
+      log('info', `Table headers: ${headerCells.join(' | ')}`);
+    }
 
-    rows.each((_i, tr) => {
-      const cells = $(tr).find('td');
-      if (cells.length < 10) return; // skip header-like rows
-
-      const rawName = $(cells.get(0)).text().trim();
-      if (!rawName) return;
-
-      // Skip the totals row — first cell matches team name or is a colspan summary
-      const nameLower = rawName.toLowerCase();
-      if (
-        nameLower === teamNameLower ||
-        nameLower.includes('total') ||
-        (teamNameLower && nameLower === teamNameLower.split(' ')[0].toLowerCase())
-      ) return;
-
-      const position = $(cells.get(1)).text().trim() || null;
-
-      // Parse stat cells (indices 2–14)
-      const c = (i) => $(cells.get(i)).text().trim();
-      const wr   = parseHAB(c(2));
-      const sp   = parseHAB(c(3));
-      const lhp  = parseHAB(c(4));
-      const rhp  = parseHAB(c(5));
-      const lo   = parseHAB(c(6));
-      const r3   = parseHAB(c(7));
-      const ph   = parseHAB(c(8));
-      const ao   = parseHAB(c(9));
-      const two  = parseHAB(c(10));
-      const wr2  = parseHAB(c(11));
-      const sp2  = parseHAB(c(12));
-      const be   = parseHAB(c(13));
-      const bl   = parseHAB(c(14));
-
-      // Match player name to roster
-      const firstLast = lastFirstToFirstLast(rawName);
-      const matched = lookupInRoster(firstLast, rosterIdx);
-
-      db.upsertSituationalHitting({
-        ncaa_team_id,
-        contest_id: game.contest_id,
-        academic_year,
-        player_name: rawName,
-        ncaa_player_id: matched?.ncaa_player_id || null,
-        position,
-        with_runners_h: wr.h,   with_runners_ab: wr.ab,
-        scorepos_h: sp.h,       scorepos_ab: sp.ab,
-        vs_lhp_h: lhp.h,        vs_lhp_ab: lhp.ab,
-        vs_rhp_h: rhp.h,        vs_rhp_ab: rhp.ab,
-        leadoff_h: lo.h,        leadoff_ab: lo.ab,
-        rbi_3rd_h: r3.h,        rbi_3rd_ab: r3.ab,
-        pinch_hit_h: ph.h,      pinch_hit_ab: ph.ab,
-        adv_outs_h: ao.h,       adv_outs_ab: ao.ab,
-        two_outs_h: two.h,      two_outs_ab: two.ab,
-        runners2_h: wr2.h,      runners2_ab: wr2.ab,
-        scorepos2_h: sp2.h,     scorepos2_ab: sp2.ab,
-        bases_empty_h: be.h,    bases_empty_ab: be.ab,
-        bases_loaded_h: bl.h,   bases_loaded_ab: bl.ab,
-      }).catch(e => emit && emit({ type: 'warn', message: `upsert failed for ${rawName}: ${e.message}` }));
-
-      saved++;
-    });
-
-    emit && emit({ type: 'info', message: `Contest ${game.contest_id}: saved ${saved} player rows` });
-    scraped++;
-    await sleep(DELAY_MS);
+    const count = parseGameTable($, targetTable, game.contest_id);
+    totalSaved += count;
+    gamesScraped++;
+    log('info', `  → ${count} player rows saved`);
   }
 
-  emit && emit({ type: 'done', message: `Situational hitting done — ${scraped} games scraped, ${skipped} skipped` });
+  log('info', `Done — ${totalSaved} total rows across ${gamesScraped} games`);
+  emit && emit({ type: 'done', message: `Situational hitting done — ${totalSaved} rows across ${gamesScraped} games` });
 }
 
 module.exports = {
