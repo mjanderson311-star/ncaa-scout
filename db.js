@@ -180,6 +180,47 @@ CREATE TABLE IF NOT EXISTS ncaa_pitching_stats (
   updated_at        TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(ncaa_team_id, ncaa_player_id, academic_year)
 );
+
+-- Situational hitting stats per player per game (scraped from /contests/:id/situational_stats)
+CREATE TABLE IF NOT EXISTS ncaa_situational_hitting (
+  id                  SERIAL PRIMARY KEY,
+  ncaa_team_id        BIGINT REFERENCES ncaa_teams(ncaa_team_id),
+  contest_id          BIGINT NOT NULL,
+  academic_year       INT NOT NULL,
+  player_name         VARCHAR(200) NOT NULL,   -- raw "Last, First" from NCAA page
+  ncaa_player_id      BIGINT,                  -- matched from roster (null if no match)
+  position            VARCHAR(20),
+  -- Each stat stored as hits (numerator) + at-bats (denominator) for clean rollups
+  with_runners_h      INT DEFAULT 0,
+  with_runners_ab     INT DEFAULT 0,
+  scorepos_h          INT DEFAULT 0,
+  scorepos_ab         INT DEFAULT 0,
+  vs_lhp_h            INT DEFAULT 0,
+  vs_lhp_ab           INT DEFAULT 0,
+  vs_rhp_h            INT DEFAULT 0,
+  vs_rhp_ab           INT DEFAULT 0,
+  leadoff_h           INT DEFAULT 0,
+  leadoff_ab          INT DEFAULT 0,
+  rbi_3rd_h           INT DEFAULT 0,
+  rbi_3rd_ab          INT DEFAULT 0,
+  pinch_hit_h         INT DEFAULT 0,
+  pinch_hit_ab        INT DEFAULT 0,
+  adv_outs_h          INT DEFAULT 0,
+  adv_outs_ab         INT DEFAULT 0,
+  two_outs_h          INT DEFAULT 0,
+  two_outs_ab         INT DEFAULT 0,
+  runners2_h          INT DEFAULT 0,
+  runners2_ab         INT DEFAULT 0,
+  scorepos2_h         INT DEFAULT 0,
+  scorepos2_ab        INT DEFAULT 0,
+  bases_empty_h       INT DEFAULT 0,
+  bases_empty_ab      INT DEFAULT 0,
+  bases_loaded_h      INT DEFAULT 0,
+  bases_loaded_ab     INT DEFAULT 0,
+  updated_at          TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(ncaa_team_id, contest_id, player_name)
+);
+CREATE INDEX IF NOT EXISTS idx_sit_hit_team_year ON ncaa_situational_hitting(ncaa_team_id, academic_year);
 `;
 
 async function ensureDatabase() {
@@ -241,14 +282,15 @@ async function getTeam(ncaa_team_id) {
 }
 
 async function deleteTeam(ncaa_team_id) {
-  // Cascade: plays → games → seasons → team
-  await pool.query(`DELETE FROM ncaa_plays   WHERE game_id IN (SELECT id FROM ncaa_games WHERE ncaa_team_id=$1)`, [ncaa_team_id]);
-  await pool.query(`DELETE FROM ncaa_batting_stats  WHERE ncaa_team_id=$1`, [ncaa_team_id]);
-  await pool.query(`DELETE FROM ncaa_pitching_stats WHERE ncaa_team_id=$1`, [ncaa_team_id]);
-  await pool.query(`DELETE FROM ncaa_players  WHERE ncaa_team_id=$1`, [ncaa_team_id]);
-  await pool.query(`DELETE FROM ncaa_games    WHERE ncaa_team_id=$1`, [ncaa_team_id]);
-  await pool.query(`DELETE FROM ncaa_seasons  WHERE ncaa_team_id=$1`, [ncaa_team_id]);
-  await pool.query(`DELETE FROM ncaa_teams    WHERE ncaa_team_id=$1`, [ncaa_team_id]);
+  // Cascade: plays → situational → stats → players → games → seasons → team
+  await pool.query(`DELETE FROM ncaa_plays               WHERE game_id IN (SELECT id FROM ncaa_games WHERE ncaa_team_id=$1)`, [ncaa_team_id]);
+  await pool.query(`DELETE FROM ncaa_situational_hitting WHERE ncaa_team_id=$1`, [ncaa_team_id]);
+  await pool.query(`DELETE FROM ncaa_batting_stats       WHERE ncaa_team_id=$1`, [ncaa_team_id]);
+  await pool.query(`DELETE FROM ncaa_pitching_stats      WHERE ncaa_team_id=$1`, [ncaa_team_id]);
+  await pool.query(`DELETE FROM ncaa_players             WHERE ncaa_team_id=$1`, [ncaa_team_id]);
+  await pool.query(`DELETE FROM ncaa_games               WHERE ncaa_team_id=$1`, [ncaa_team_id]);
+  await pool.query(`DELETE FROM ncaa_seasons             WHERE ncaa_team_id=$1`, [ncaa_team_id]);
+  await pool.query(`DELETE FROM ncaa_teams               WHERE ncaa_team_id=$1`, [ncaa_team_id]);
 }
 
 async function searchTeams({ name, conference, division, sport_code = 'MBA' }) {
@@ -656,6 +698,87 @@ async function resetPbpForGames(gameIds) {
   return rowCount;
 }
 
+// ─── Situational hitting helpers ───────────────────────────────────────────
+
+async function upsertSituationalHitting(r) {
+  const sql = `
+    INSERT INTO ncaa_situational_hitting (
+      ncaa_team_id, contest_id, academic_year, player_name, ncaa_player_id, position,
+      with_runners_h, with_runners_ab, scorepos_h, scorepos_ab,
+      vs_lhp_h, vs_lhp_ab, vs_rhp_h, vs_rhp_ab,
+      leadoff_h, leadoff_ab, rbi_3rd_h, rbi_3rd_ab,
+      pinch_hit_h, pinch_hit_ab, adv_outs_h, adv_outs_ab,
+      two_outs_h, two_outs_ab, runners2_h, runners2_ab,
+      scorepos2_h, scorepos2_ab, bases_empty_h, bases_empty_ab,
+      bases_loaded_h, bases_loaded_ab, updated_at
+    ) VALUES (
+      $1,$2,$3,$4,$5,$6,
+      $7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+      $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,NOW()
+    )
+    ON CONFLICT (ncaa_team_id, contest_id, player_name) DO UPDATE SET
+      ncaa_player_id=$5, position=$6,
+      with_runners_h=$7, with_runners_ab=$8, scorepos_h=$9, scorepos_ab=$10,
+      vs_lhp_h=$11, vs_lhp_ab=$12, vs_rhp_h=$13, vs_rhp_ab=$14,
+      leadoff_h=$15, leadoff_ab=$16, rbi_3rd_h=$17, rbi_3rd_ab=$18,
+      pinch_hit_h=$19, pinch_hit_ab=$20, adv_outs_h=$21, adv_outs_ab=$22,
+      two_outs_h=$23, two_outs_ab=$24, runners2_h=$25, runners2_ab=$26,
+      scorepos2_h=$27, scorepos2_ab=$28, bases_empty_h=$29, bases_empty_ab=$30,
+      bases_loaded_h=$31, bases_loaded_ab=$32, updated_at=NOW()`;
+  await pool.query(sql, [
+    r.ncaa_team_id, r.contest_id, r.academic_year, r.player_name, r.ncaa_player_id||null, r.position||null,
+    r.with_runners_h||0, r.with_runners_ab||0, r.scorepos_h||0, r.scorepos_ab||0,
+    r.vs_lhp_h||0, r.vs_lhp_ab||0, r.vs_rhp_h||0, r.vs_rhp_ab||0,
+    r.leadoff_h||0, r.leadoff_ab||0, r.rbi_3rd_h||0, r.rbi_3rd_ab||0,
+    r.pinch_hit_h||0, r.pinch_hit_ab||0, r.adv_outs_h||0, r.adv_outs_ab||0,
+    r.two_outs_h||0, r.two_outs_ab||0, r.runners2_h||0, r.runners2_ab||0,
+    r.scorepos2_h||0, r.scorepos2_ab||0, r.bases_empty_h||0, r.bases_empty_ab||0,
+    r.bases_loaded_h||0, r.bases_loaded_ab||0,
+  ]);
+}
+
+// Per-game situational hitting for a team
+async function getSituationalHitting(ncaa_team_id, academic_year, contest_id = null) {
+  const params = [ncaa_team_id, academic_year];
+  const contestFilter = contest_id ? `AND sh.contest_id=$3` : '';
+  if (contest_id) params.push(contest_id);
+  const { rows } = await pool.query(`
+    SELECT sh.*, g.game_date, g.opponent_name, g.our_score, g.opp_score, g.result
+    FROM ncaa_situational_hitting sh
+    JOIN ncaa_games g ON g.ncaa_team_id = sh.ncaa_team_id AND g.contest_id = sh.contest_id
+    WHERE sh.ncaa_team_id=$1 AND sh.academic_year=$2 ${contestFilter}
+    ORDER BY g.game_date, sh.player_name
+  `, params);
+  return rows;
+}
+
+// Season rollup — sum h/ab across all games per player
+async function getSituationalHittingRollup(ncaa_team_id, academic_year) {
+  const { rows } = await pool.query(`
+    SELECT
+      player_name, ncaa_player_id, position,
+      COUNT(DISTINCT contest_id) AS games,
+      SUM(with_runners_h) AS with_runners_h,   SUM(with_runners_ab) AS with_runners_ab,
+      SUM(scorepos_h) AS scorepos_h,           SUM(scorepos_ab) AS scorepos_ab,
+      SUM(vs_lhp_h) AS vs_lhp_h,              SUM(vs_lhp_ab) AS vs_lhp_ab,
+      SUM(vs_rhp_h) AS vs_rhp_h,              SUM(vs_rhp_ab) AS vs_rhp_ab,
+      SUM(leadoff_h) AS leadoff_h,             SUM(leadoff_ab) AS leadoff_ab,
+      SUM(rbi_3rd_h) AS rbi_3rd_h,            SUM(rbi_3rd_ab) AS rbi_3rd_ab,
+      SUM(pinch_hit_h) AS pinch_hit_h,         SUM(pinch_hit_ab) AS pinch_hit_ab,
+      SUM(adv_outs_h) AS adv_outs_h,           SUM(adv_outs_ab) AS adv_outs_ab,
+      SUM(two_outs_h) AS two_outs_h,           SUM(two_outs_ab) AS two_outs_ab,
+      SUM(runners2_h) AS runners2_h,           SUM(runners2_ab) AS runners2_ab,
+      SUM(scorepos2_h) AS scorepos2_h,         SUM(scorepos2_ab) AS scorepos2_ab,
+      SUM(bases_empty_h) AS bases_empty_h,     SUM(bases_empty_ab) AS bases_empty_ab,
+      SUM(bases_loaded_h) AS bases_loaded_h,   SUM(bases_loaded_ab) AS bases_loaded_ab
+    FROM ncaa_situational_hitting
+    WHERE ncaa_team_id=$1 AND academic_year=$2
+    GROUP BY player_name, ncaa_player_id, position
+    ORDER BY player_name
+  `, [ncaa_team_id, academic_year]);
+  return rows;
+}
+
 module.exports = {
   pool,
   initSchema,
@@ -673,6 +796,8 @@ module.exports = {
   updatePlayPitcher, getAllPlaysForSeason,
   // stats
   upsertBattingStats, upsertPitchingStats, getBattingStats, getPitchingStats,
+  // situational hitting
+  upsertSituationalHitting, getSituationalHitting, getSituationalHittingRollup,
   // matchup
   getMatchupPlays,
   // h2h

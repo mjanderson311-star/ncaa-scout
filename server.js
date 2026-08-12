@@ -330,6 +330,40 @@ app.post('/api/scrape/resolve-pitchers/:team_id', requireAdmin, async (req, res)
   }
 });
 
+// POST /api/scrape/situational/:team_id — scrape situational hitting for all games of a team/year
+app.post('/api/scrape/situational/:team_id', requireAdmin, async (req, res) => {
+  try {
+    const { academic_year } = req.body;
+    if (!academic_year) return res.status(400).json({ error: 'academic_year required' });
+    const jobId = createJob();
+    res.json({ jobId });
+    const emit = (ev) => jobEmit(jobId, ev);
+    await scraper.scrapeSituationalHitting(Number(req.params.team_id), Number(academic_year), emit);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/scout/:team_id/:year/situational — per-game situational hitting rows
+app.get('/api/scout/:team_id/:year/situational', async (req, res) => {
+  try {
+    const rows = await db.getSituationalHitting(Number(req.params.team_id), Number(req.params.year));
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/scout/:team_id/:year/situational/rollup — season totals per player
+app.get('/api/scout/:team_id/:year/situational/rollup', async (req, res) => {
+  try {
+    const rows = await db.getSituationalHittingRollup(Number(req.params.team_id), Number(req.params.year));
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/debug/matchup-raw?team_a=&team_b=&year= — diagnose batting attribution in matchup
 app.get('/api/debug/matchup-raw', async (req, res) => {
   try {
