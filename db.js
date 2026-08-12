@@ -14,7 +14,12 @@ function makePoolConfig(dbName) {
   if (process.env.DATABASE_URL) {
     // Replace database name in URL if needed
     const url = process.env.DATABASE_URL.replace(/\/[^/?]+(\?|$)/, `/${dbName}$1`);
-    return { connectionString: url, max: 10 };
+    const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
+    return {
+      connectionString: url,
+      max: 10,
+      ssl: isLocal ? false : { rejectUnauthorized: false },
+    };
   }
   return {
     host:     process.env.PGHOST     || 'localhost',
