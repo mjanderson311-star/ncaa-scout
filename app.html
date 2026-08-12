@@ -400,6 +400,10 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
               Resolve Pitchers
             </button>
+            <button class="btn btn-secondary" id="scrape-situational-btn" onclick="startSituationalScrape()" title="Scrape situational hitting stats for all games">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              Situational
+            </button>
             <button class="btn btn-secondary" onclick="viewScrapedTeam()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               View in Scout
@@ -1075,6 +1079,48 @@ async function startStatsScrape() {
 
   try {
     const { jobId } = await apiFetch(`/api/scrape/stats/${team.ncaa_team_id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ academic_year: Number(year) })
+    });
+    state.activeJobId = jobId;
+
+    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    state.activeJobEs = es;
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data);
+      logLine(ev.type === 'done' ? 'done' : ev.type, ev.message || JSON.stringify(ev));
+      if (ev.type === 'done' || ev.type === 'error_fatal') {
+        btn.disabled = false;
+        es.close();
+        state.activeJobEs = null;
+      }
+    };
+    es.onerror = () => {
+      logLine('error', 'Connection lost');
+      btn.disabled = false;
+      es.close();
+    };
+  } catch (e) {
+    logLine('error', e.message);
+    btn.disabled = false;
+  }
+}
+
+async function startSituationalScrape() {
+  const team = state.selectedAdminTeam;
+  if (!team) return;
+  const year = document.getElementById('scrape-year').value;
+  const btn  = document.getElementById('scrape-situational-btn');
+
+  btn.disabled = true;
+  clearLog();
+  logLine('info', `Scraping situational hitting: ${team.name} · ${year}`);
+
+  if (state.activeJobEs) { state.activeJobEs.close(); state.activeJobEs = null; }
+
+  try {
+    const { jobId } = await apiFetch(`/api/scrape/situational/${team.ncaa_team_id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ academic_year: Number(year) })
